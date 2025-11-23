@@ -160,11 +160,14 @@ def can_broadcast_today(user_id):
     data = load_user_data()
     if str(user_id) not in data:
         return True
+    
     last_broadcast = data[str(user_id)].get('last_broadcast')
     if not last_broadcast:
         return True
+    
     last_date = datetime.fromisoformat(last_broadcast).date()
     today = datetime.now().date()
+    
     return last_date < today
 
 def mark_broadcast_sent(user_id):
@@ -215,9 +218,9 @@ def get_and_clear_message_ids(user_id):
     return []
 
 # =====================================================
-#  Очистка чата
+#  Очистка чата раз в час
 # =====================================================
-async def clean_chat(bot, chat_id):
+async def clean_chat_hourly(bot, chat_id):
     message_ids = get_and_clear_message_ids(chat_id)
     for msg_id in message_ids:
         try:
@@ -225,23 +228,15 @@ async def clean_chat(bot, chat_id):
         except Exception as e:
             logger.debug(f"Не удалось удалить сообщение {msg_id}: {e}")
 
-async def send_with_autodelete(bot, chat_id, text, delay_seconds=60, reply_markup=None, no_delete=False):
-    """Отправляет сообщение и планирует его удаление"""
+# =====================================================
+#  Отправка сообщений
+# =====================================================
+async def send_with_autodelete(bot, chat_id, text, reply_markup=None, no_delete=False):
     msg = await bot.send_message(chat_id, text, reply_markup=reply_markup)
     
-    if no_delete:
-        return msg
+    if not no_delete:
+        store_message_id(chat_id, msg.message_id)
     
-    store_message_id(chat_id, msg.message_id)
-    
-    async def delete_later():
-        await asyncio.sleep(delay_seconds)
-        try:
-            await bot.delete_message(chat_id, msg.message_id)
-        except:
-            pass
-    
-    asyncio.create_task(delete_later())
     return msg
 
 # =====================================================
@@ -256,12 +251,14 @@ async def send_morning_message(context: ContextTypes.DEFAULT_TYPE):
     
     days = get_days_count(chat_id)
     
-    if days in MILESTONES:
-        text = MILESTONES[days]
-    else:
-        text = random.choice(MORNING_MESSAGES)
+    text = MILESTONES.get(days, random.choice(MORNING_MESSAGES))
     
-    await send_with_autodelete(context.bot, chat_id, text, delay_seconds=3600, reply_markup=get_main_keyboard())
+    await send_with_autodelete(
+        context.bot, 
+        chat_id, 
+        text, 
+        reply_markup=get_main_keyboard()
+    )
     logger.info(f"Утреннее сообщение отправлено пользователю {chat_id}")
 
 async def send_evening_message(context: ContextTypes.DEFAULT_TYPE):
@@ -272,7 +269,13 @@ async def send_evening_message(context: ContextTypes.DEFAULT_TYPE):
         return
     
     text = random.choice(EVENING_MESSAGES)
-    await send_with_autodelete(context.bot, chat_id, text, delay_seconds=3600, reply_markup=get_main_keyboard())
+    
+    await send_with_autodelete(
+        context.bot, 
+        chat_id, 
+        text, 
+        reply_markup=get_main_keyboard()
+    )
     logger.info(f"Вечернее сообщение отправлено пользователю {chat_id}")
 
 async def send_night_message(context: ContextTypes.DEFAULT_TYPE):
@@ -283,7 +286,13 @@ async def send_night_message(context: ContextTypes.DEFAULT_TYPE):
         return
     
     text = random.choice(NIGHT_MESSAGES)
-    await send_with_autodelete(context.bot, chat_id, text, delay_seconds=3600, reply_markup=get_main_keyboard())
+    
+    await send_with_autodelete(
+        context.bot, 
+        chat_id, 
+        text, 
+        reply_markup=get_main_keyboard()
+    )
     logger.info(f"Ночное сообщение отправлено пользователю {chat_id}")
 
 # =====================================================
@@ -293,7 +302,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat_id = update.effective_chat.id
     
-    await clean_chat(context.bot, chat_id)
+    await clean_chat_hourly(context.bot, chat_id)
     
     old_welcome_id = delete_old_welcome(chat_id)
     if old_welcome_id:
@@ -306,9 +315,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if str(chat_id) not in data:
         data[str(chat_id)] = {}
     
-    if 'start_date' not in data[str(chat_id)]:
-        data[str(chat_id)]['start_date'] = datetime.now().isoformat()
-    
+    data[str(chat_id)]['start_date'] = data[str(chat_id)].get('start_date', datetime.now().isoformat())
     data[str(chat_id)]['active'] = True
     data[str(chat_id)]['message_ids'] = []
     save_user_data(data)
@@ -327,15 +334,31 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for job in context.job_queue.get_jobs_by_name(name):
             job.schedule_removal()
     
-    context.job_queue.run_daily(send_morning_message, time=time(hour=9, minute=0, second=0), chat_id=chat_id, name=f"morning_{chat_id}")
-    context.job_queue.run_daily(send_evening_message, time=time(hour=18, minute=0, second=0), chat_id=chat_id, name=f"evening_{chat_id}")
-    context.job_queue.run_daily(send_night_message, time=time(hour=23, minute=0, second=0), chat_id=chat_id, name=f"night_{chat_id}")
+    context.job_queue.run_daily(
+        send_morning_message,
+        time=time(hour=9, minute=0, second=0),
+        chat_id=chat_id,
+        name=f"morning_{chat_id}"
+    )
+    context.job_queue.run_daily(
+        send_evening_message,
+        time=time(hour=18, minute=0, second=0),
+        chat_id=chat_id,
+        name=f"evening_{chat_id}"
+    )
+    context.job_queue.run_daily(
+        send_night_message,
+        time=time(hour=23, minute=0, second=0),
+        chat_id=chat_id,
+        name=f"night_{chat_id}"
+    )
     
     logger.info(f"Пользователь {user.first_name} ({user.id}) запустил бота")
 
 async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
-    await clean_chat(context.bot, chat_id)
+    
+    await clean_chat_hourly(context.bot, chat_id)
     
     data = load_user_data()
     if str(chat_id) in data:
@@ -358,7 +381,12 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def reset_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     reset_counter(chat_id)
-    await send_with_autodelete(context.bot, chat_id, "Счётчик обнулён. Начинаем заново.", reply_markup=get_main_keyboard())
+    await send_with_autodelete(
+        context.bot,
+        chat_id,
+        "Счётчик обнулён. Начинаем заново.",
+        reply_markup=get_main_keyboard()
+    )
     logger.info(f"Пользователь {chat_id} сбросил счётчик")
 
 # =====================================================
@@ -370,19 +398,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message_id = update.message.message_id
     
     if text in ["▶ Начать", "⏸ Пауза"]:
-        await clean_chat(context.bot, chat_id)
+        await clean_chat_hourly(context.bot, chat_id)
         try:
             await update.message.delete()
         except:
             pass
-    else:
-        async def delete_user_msg():
-            await asyncio.sleep(60)
-            try:
-                await context.bot.delete_message(chat_id, user_message_id)
-            except:
-                pass
-        asyncio.create_task(delete_user_msg())
     
     if text == "▶ Начать":
         await start(update, context)
@@ -392,46 +412,57 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for i, resp in enumerate(responses):
             if i > 0:
                 await asyncio.sleep(random.uniform(1.0, 2.0))
-            if i == len(responses) - 1:
-                await send_with_autodelete(context.bot, chat_id, resp, reply_markup=get_main_keyboard())
-            else:
-                await send_with_autodelete(context.bot, chat_id, resp)
+            await send_with_autodelete(
+                context.bot, 
+                chat_id, 
+                resp,
+                reply_markup=get_main_keyboard() if i == len(responses)-1 else None
+            )
     
     elif text == "🔥 Держусь!":
         if not can_broadcast_today(chat_id):
-            await send_with_autodelete(context.bot, chat_id, "Ты уже отправил сигнал сегодня. Завтра снова сможешь.", reply_markup=get_main_keyboard())
+            await send_with_autodelete(
+                context.bot,
+                chat_id,
+                "Ты уже отправил сигнал сегодня. Завтра снова сможешь.",
+                reply_markup=get_main_keyboard()
+            )
             return
         
         all_users = get_all_active_users()
-        sent_count = 0
+        
         for user_id in all_users:
             if user_id != chat_id:
                 try:
-                    await context.bot.send_message(user_id, "💪\n\nКто-то справляется. Ты тоже можешь.", reply_markup=get_main_keyboard())
-                    sent_count += 1
+                    await context.bot.send_message(
+                        user_id,
+                        "💪\n\nКто-то справляется. Ты тоже можешь.",
+                        reply_markup=get_main_keyboard()
+                    )
                     await asyncio.sleep(0.1)
                 except Exception as e:
                     logger.error(f"Не удалось отправить сообщение пользователю {user_id}: {e}")
         
         mark_broadcast_sent(chat_id)
-        
-        if sent_count > 0:
-            await send_with_autodelete(context.bot, chat_id, f"Сигнал отправлен ({sent_count} чел). Ты молодец.", reply_markup=get_main_keyboard())
-        else:
-            await send_with_autodelete(context.bot, chat_id, "Пока ты один используешь бота. Но ты всё равно молодец.", reply_markup=get_main_keyboard())
-        
-        logger.info(f"Пользователь {chat_id} отправил broadcast {sent_count} получателям")
     
     elif text == "😔 Тяжело":
         context.user_data['awaiting_relapse_confirm'] = True
-        await send_with_autodelete(context.bot, chat_id, "Брат, ты сорвался?", reply_markup=get_relapse_keyboard())
+        await send_with_autodelete(
+            context.bot,
+            chat_id,
+            "Брат, ты сорвался?",
+            reply_markup=get_relapse_keyboard()
+        )
     
     elif text == "📊 Дни":
         days = get_days_count(chat_id)
-        msg_text = f"Прошло {days} дней" if days != 1 else "Прошёл 1 день"
-        if days == 0:
-            msg_text = "Первый день. Начинаем."
-        await send_with_autodelete(context.bot, chat_id, msg_text, reply_markup=get_main_keyboard())
+        msg_text = "Первый день. Начинаем." if days==0 else f"Прошло {days} дней" if days>1 else "Прошёл 1 день"
+        await send_with_autodelete(
+            context.bot, 
+            chat_id, 
+            msg_text,
+            reply_markup=get_main_keyboard()
+        )
     
     elif text == "⏸ Пауза":
         await stop(update, context)
@@ -439,11 +470,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif context.user_data.get('awaiting_relapse_confirm'):
         if text == "Да":
             reset_counter(chat_id)
-            await send_with_autodelete(context.bot, chat_id, "Ничего страшного. Начнём снова.", reply_markup=get_main_keyboard())
+            await send_with_autodelete(
+                context.bot,
+                chat_id,
+                "Ничего страшного. Начнём снова.",
+                reply_markup=get_main_keyboard()
+            )
             logger.info(f"Пользователь {chat_id} подтвердил срыв")
         elif text == "Нет":
             responses = ["Красава, держись. Я с тобой.", "Молодец, брат. Ты сильный.", "Уважаю. Держимся вместе."]
-            await send_with_autodelete(context.bot, chat_id, random.choice(responses), reply_markup=get_main_keyboard())
+            await send_with_autodelete(
+                context.bot,
+                chat_id,
+                random.choice(responses),
+                reply_markup=get_main_keyboard()
+            )
         context.user_data['awaiting_relapse_confirm'] = False
 
 # =====================================================
