@@ -188,29 +188,26 @@ async def clean_chat(bot, chat_id):
         except Exception as e:
             logger.debug(f"Не удалось удалить сообщение {msg_id}: {e}")
 
-async def send_with_autodelete(bot, chat_id, text, delay_seconds=3600, reply_markup=None, keep_keyboard=False, is_welcome=False):
+async def send_with_autodelete(bot, chat_id, text, delay_seconds=3600, reply_markup=None):
     """Отправляет сообщение и планирует его удаление"""
     msg = await bot.send_message(chat_id, text, reply_markup=reply_markup)
     
-    # Приветствие не сохраняем и не удаляем
-    if is_welcome:
-        return msg
-    
-    # Если это сообщение с клавиатурой - не сохраняем для clean_chat, но удаляем по таймеру
-    if not keep_keyboard:
+    # Если есть клавиатура - НЕ удаляем и НЕ сохраняем
+    if reply_markup is None:
         store_message_id(chat_id, msg.message_id)
-    
-    # Планируем удаление
-    async def delete_later():
+        
+        # Планируем удаление
+        async def delete_later():
+            import asyncio
+            await asyncio.sleep(delay_seconds)
+            try:
+                await bot.delete_message(chat_id, msg.message_id)
+            except:
+                pass
+        
         import asyncio
-        await asyncio.sleep(delay_seconds)
-        try:
-            await bot.delete_message(chat_id, msg.message_id)
-        except:
-            pass
+        asyncio.create_task(delete_later())
     
-    import asyncio
-    asyncio.create_task(delete_later())
     return msg
 
 # =====================================================
@@ -285,9 +282,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Привет.\n"
         "Я буду писать тебе время от времени. Диалоги стираются, не переживай.\n\n"
         "Держись. Не сегодня.",
-        delay_seconds=600,
-        reply_markup=get_main_keyboard(),
-        is_welcome=True  # Это приветствие - не удаляем
+        reply_markup=get_main_keyboard()  # С клавиатурой - не удалится
     )
     
     # Удаляем старые задачи
@@ -340,9 +335,7 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.bot,
         chat_id,
         "Напоминания остановлены. Нажми ▶ Начать чтобы возобновить.",
-        delay_seconds=300,
-        reply_markup=get_start_keyboard()
-        # keep_keyboard убрали
+        reply_markup=get_start_keyboard()  # С клавиатурой - не удалится
     )
     logger.info(f"Пользователь {chat_id} остановил бота")
 
