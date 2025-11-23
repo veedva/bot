@@ -395,18 +395,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if i > 0:
                 import asyncio
                 await asyncio.sleep(random.uniform(1.0, 2.0))
-            # Последнее сообщение - с клавиатурой, остальные - без
-            if i == len(responses) - 1:
-                await send_with_autodelete(
-                    context.bot, 
-                    chat_id, 
-                    resp, 
-                    delay_seconds=10,  # 10 секунд
-                    reply_markup=get_main_keyboard()
-                    # keep_keyboard убрали - пусть удаляется
-                )
-            else:
-                await send_with_autodelete(context.bot, chat_id, resp, delay_seconds=10)  # 10 секунд30)
+            # БЕЗ клавиатуры - она уже есть в приветствии
+            await send_with_autodelete(context.bot, chat_id, resp, delay_seconds=10)30)
     
     elif text == "😔 Тяжело":
         context.user_data['awaiting_relapse_confirm'] = True
@@ -427,14 +417,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             msg_text = "Прошёл 1 день"
         else:
             msg_text = f"Прошло {days} дней"
-        await send_with_autodelete(
-            context.bot, 
-            chat_id, 
-            msg_text, 
-            delay_seconds=10,  # 10 секунд
-            reply_markup=get_main_keyboard()
-            # keep_keyboard убрали - пусть удаляется
-        )
+        # БЕЗ клавиатуры
+        await send_with_autodelete(context.bot, chat_id, msg_text, delay_seconds=10)
     
     elif text == "⏸ Пауза":
         await stop(update, context)
