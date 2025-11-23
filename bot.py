@@ -418,41 +418,41 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 resp,
                 reply_markup=get_main_keyboard() if i == len(responses)-1 else None
             )
-    
-elif text == "🔥 Держусь!":
-    if not can_broadcast_today(chat_id):
+
+    elif text == "🔥 Держусь!":
+        if not can_broadcast_today(chat_id):
+            await send_with_autodelete(
+                context.bot,
+                chat_id,
+                "Ты уже отправил сигнал сегодня. Завтра снова сможешь.",
+                reply_markup=get_main_keyboard()
+            )
+            return
+        
+        # Сначала подтверждаем отправку
         await send_with_autodelete(
             context.bot,
             chat_id,
-            "Ты уже отправил сигнал сегодня. Завтра снова сможешь.",
+            "Сигнал отправлен. Ты молодец! 💪",
             reply_markup=get_main_keyboard()
         )
-        return
-    
-    # Сначала подтверждаем отправку
-    await send_with_autodelete(
-        context.bot,
-        chat_id,
-        "Сигнал отправлен. Ты молодец! 💪",
-        reply_markup=get_main_keyboard()
-    )
-    
-    # Затем рассылаем другим
-    all_users = get_all_active_users()
-    
-    for user_id in all_users:
-        if user_id != chat_id:
-            try:
-                await context.bot.send_message(
-                    user_id,
-                    "💪\n\nКто-то справляется. Ты тоже можешь.",
-                    reply_markup=get_main_keyboard()
-                )
-                await asyncio.sleep(0.1)
-            except Exception as e:
-                logger.error(f"Не удалось отправить сообщение пользователю {user_id}: {e}")
-    
-    mark_broadcast_sent(chat_id)
+        
+        # Затем рассылаем другим
+        all_users = get_all_active_users()
+        
+        for user_id in all_users:
+            if user_id != chat_id:
+                try:
+                    await context.bot.send_message(
+                        user_id,
+                        "💪\n\nКто-то справляется. Ты тоже можешь.",
+                        reply_markup=get_main_keyboard()
+                    )
+                    await asyncio.sleep(0.1)
+                except Exception as e:
+                    logger.error(f"Не удалось отправить сообщение пользователю {user_id}: {e}")
+        
+        mark_broadcast_sent(chat_id)
     
     elif text == "😔 Тяжело":
         context.user_data['awaiting_relapse_confirm'] = True
