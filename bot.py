@@ -188,22 +188,26 @@ async def clean_chat(bot, chat_id):
         except Exception as e:
             logger.debug(f"Не удалось удалить сообщение {msg_id}: {e}")
 
-async def send_with_autodelete(bot, chat_id, text, delay_seconds=3600, reply_markup=None):
+async def send_with_autodelete(bot, chat_id, text, delay_seconds=3600, reply_markup=None, keep_keyboard=False):
     """Отправляет сообщение и планирует его удаление"""
     msg = await bot.send_message(chat_id, text, reply_markup=reply_markup)
-    store_message_id(chat_id, msg.message_id)
     
-    # Планируем удаление
-    async def delete_later():
+    # Если это сообщение с клавиатурой - не сохраняем для удаления
+    if not keep_keyboard:
+        store_message_id(chat_id, msg.message_id)
+    
+    # Планируем удаление только если не keep_keyboard
+    if not keep_keyboard:
+        async def delete_later():
+            import asyncio
+            await asyncio.sleep(delay_seconds)
+            try:
+                await bot.delete_message(chat_id, msg.message_id)
+            except:
+                pass
+        
         import asyncio
-        await asyncio.sleep(delay_seconds)
-        try:
-            await bot.delete_message(chat_id, msg.message_id)
-        except:
-            pass
-    
-    import asyncio
-    asyncio.create_task(delete_later())
+        asyncio.create_task(delete_later())
     return msg
 
 # =====================================================
@@ -283,7 +287,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Держимся вместе. Не сегодня.\n\n"
         "💡 Сообщения удаляются автоматически для конфиденциальности.",
         delay_seconds=600,
-        reply_markup=get_main_keyboard()
+        reply_markup=get_main_keyboard(),
+        keep_keyboard=True  # Не удаляем это сообщение - там кнопки
     )
     
     # Удаляем старые задачи
@@ -337,7 +342,8 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id,
         "Напоминания остановлены. Нажми ▶ Начать чтобы возобновить.",
         delay_seconds=300,
-        reply_markup=get_start_keyboard()
+        reply_markup=get_start_keyboard(),
+        keep_keyboard=True  # Не удаляем - там кнопка
     )
     logger.info(f"Пользователь {chat_id} остановил бота")
 
@@ -377,7 +383,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if i > 0:
                 import asyncio
                 await asyncio.sleep(random.uniform(1.0, 2.0))
-            await send_with_autodelete(context.bot, chat_id, resp, delay_seconds=30)
+            # Последнее сообщение - с клавиатурой, остальные - без
+            if i == len(responses) - 1:
+                await send_with_autodelete(
+                    context.bot, 
+                    chat_id, 
+                    resp, 
+                    delay_seconds=30,
+                    reply_markup=get_main_keyboard(),
+                    keep_keyboard=True
+                )
+            else:
+                await send_with_autodelete(context.bot, chat_id, resp, delay_seconds=30)
     
     elif text == "😔 Тяжело":
         context.user_data['awaiting_relapse_confirm'] = True
@@ -386,7 +403,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id,
             "Брат, ты сорвался?",
             delay_seconds=60,
-            reply_markup=get_relapse_keyboard()
+            reply_markup=get_relapse_keyboard(),
+            keep_keyboard=True  # Не удаляем - там кнопки Да/Нет
         )
     
     elif text == "📊 Дни":
@@ -397,7 +415,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             msg_text = "Прошёл 1 день"
         else:
             msg_text = f"Прошло {days} дней"
-        await send_with_autodelete(context.bot, chat_id, msg_text, delay_seconds=20)
+        await send_with_autodelete(
+            context.bot, 
+            chat_id, 
+            msg_text, 
+            delay_seconds=20,
+            reply_markup=get_main_keyboard(),
+            keep_keyboard=True
+        )
     
     elif text == "⏸ Пауза":
         await stop(update, context)
@@ -411,7 +436,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 chat_id,
                 "Ничего страшного. Начнём снова.",
                 delay_seconds=30,
-                reply_markup=get_main_keyboard()
+                reply_markup=get_main_keyboard(),
+                keep_keyboard=True  # Возвращаем основную клавиатуру
             )
             logger.info(f"Пользователь {chat_id} подтвердил срыв")
         elif text == "Нет":
@@ -421,7 +447,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 chat_id,
                 random.choice(responses),
                 delay_seconds=30,
-                reply_markup=get_main_keyboard()
+                reply_markup=get_main_keyboard(),
+                keep_keyboard=True  # Возвращаем основную клавиатуру
             )
         context.user_data['awaiting_relapse_confirm'] = False
 
