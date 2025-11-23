@@ -279,13 +279,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_with_autodelete(
         context.bot,
         chat_id,
-        f"Привет, {user.first_name}.\n\n"
-        "Я буду писать тебе трижды в день:\n"
-        "• Утром в 9:00\n"
-        "• Вечером в 18:00\n"
-        "• На ночь в 23:00\n\n"
-        "Держимся вместе. Не сегодня.\n\n"
-        "💡 Сообщения удаляются автоматически для конфиденциальности.",
+        "Привет.\n"
+        "Я буду писать тебе время от времени. Диалоги стираются, не переживай.\n\n"
+        "Держись. Не сегодня.",
         delay_seconds=600,
         reply_markup=get_main_keyboard(),
         keep_keyboard=True  # Не удаляем это сообщение - там кнопки
@@ -364,16 +360,28 @@ async def reset_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     chat_id = update.effective_chat.id
-    
-    # Удаляем сообщение пользователя
-    try:
-        await update.message.delete()
-    except:
-        pass
+    user_message_id = update.message.message_id
     
     # Чистим чат ТОЛЬКО при старте/паузе, не при каждой кнопке
     if text in ["▶ Начать", "⏸ Пауза"]:
         await clean_chat(context.bot, chat_id)
+        # Удаляем сообщение пользователя сразу для старта/паузы
+        try:
+            await update.message.delete()
+        except:
+            pass
+    else:
+        # Для остальных кнопок - удаляем через 10 секунд
+        async def delete_user_msg():
+            import asyncio
+            await asyncio.sleep(10)
+            try:
+                await context.bot.delete_message(chat_id, user_message_id)
+            except:
+                pass
+        
+        import asyncio
+        asyncio.create_task(delete_user_msg())
     
     if text == "▶ Начать":
         await start(update, context)
@@ -390,12 +398,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     context.bot, 
                     chat_id, 
                     resp, 
-                    delay_seconds=120,  # 2 минуты для последнего
+                    delay_seconds=10,  # 10 секунд
                     reply_markup=get_main_keyboard(),
                     keep_keyboard=True
                 )
             else:
-                await send_with_autodelete(context.bot, chat_id, resp, delay_seconds=120)  # 2 минуты30)
+                await send_with_autodelete(context.bot, chat_id, resp, delay_seconds=10)  # 10 секунд30)
     
     elif text == "😔 Тяжело":
         context.user_data['awaiting_relapse_confirm'] = True
@@ -420,7 +428,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.bot, 
             chat_id, 
             msg_text, 
-            delay_seconds=20,
+            delay_seconds=10,  # 10 секунд
             reply_markup=get_main_keyboard(),
             keep_keyboard=True
         )
@@ -466,9 +474,6 @@ def main():
     
     logger.info("Бот запущен")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
-
-if __name__ == '__main__':
-    main()
 
 if __name__ == '__main__':
     main()
