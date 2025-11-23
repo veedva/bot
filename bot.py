@@ -116,7 +116,8 @@ MILESTONES = {
 def get_main_keyboard():
     keyboard = [
         [KeyboardButton("👋 Ты тут?"), KeyboardButton("😔 Тяжело")],
-        [KeyboardButton("📊 Дни"), KeyboardButton("⏸ Пауза")]
+        [KeyboardButton("🔥 Держусь!"), KeyboardButton("📊 Дни")],
+        [KeyboardButton("⏸ Пауза")]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
@@ -154,6 +155,38 @@ def reset_counter(user_id):
     if str(user_id) in data:
         data[str(user_id)]['start_date'] = datetime.now().isoformat()
         save_user_data(data)
+
+def can_broadcast_today(user_id):
+    """Проверяет, может ли пользователь отправить рассылку сегодня"""
+    data = load_user_data()
+    if str(user_id) not in data:
+        return True
+    
+    last_broadcast = data[str(user_id)].get('last_broadcast')
+    if not last_broadcast:
+        return True
+    
+    last_date = datetime.fromisoformat(last_broadcast).date()
+    today = datetime.now().date()
+    
+    return last_date < today
+
+def mark_broadcast_sent(user_id):
+    """Отмечает что пользователь отправил рассылку сегодня"""
+    data = load_user_data()
+    if str(user_id) not in data:
+        data[str(user_id)] = {}
+    data[str(user_id)]['last_broadcast'] = datetime.now().isoformat()
+    save_user_data(data)
+
+def get_all_active_users():
+    """Возвращает список всех активных пользователей"""
+    data = load_user_data()
+    active_users = []
+    for user_id, user_data in data.items():
+        if user_data.get('active', False):
+            active_users.append(int(user_id))
+    return active_users
 
 def store_message_id(user_id, message_id):
     """Сохраняем ID сообщения для последующего удаления"""
@@ -390,6 +423,51 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if i > 0:
                 await asyncio.sleep(random.uniform(1.0, 2.0))
             await send_with_autodelete(context.bot, chat_id, resp)  # 60 сек по умолчанию
+    
+    elif text == "🔥 Держусь!":
+        # Проверяем можно ли отправить сегодня
+        if not can_broadcast_today(chat_id):
+            await send_with_autodelete(
+                context.bot,
+                chat_id,
+                "Ты уже отправил сигнал сегодня. Завтра снова сможешь."
+            )
+            return
+        
+        # Отправляем всем активным пользователям (кроме отправителя)
+        all_users = get_all_active_users()
+        sent_count = 0
+        
+        for user_id in all_users:
+            if user_id != chat_id:  # Не отправляем самому себе
+                try:
+                    await context.bot.send_message(
+                        user_id,
+                        "💪\n\nКто-то справляется. Ты тоже можешь."
+                    )
+                    sent_count += 1
+                    await asyncio.sleep(0.1)  # Небольшая задержка между отправками
+                except Exception as e:
+                    logger.error(f"Не удалось отправить сообщение пользователю {user_id}: {e}")
+        
+        # Отмечаем что отправил
+        mark_broadcast_sent(chat_id)
+        
+        # Подтверждение отправителю
+        if sent_count > 0:
+            await send_with_autodelete(
+                context.bot,
+                chat_id,
+                f"Сигнал отправлен ({sent_count} чел). Ты молодец."
+            )
+        else:
+            await send_with_autodelete(
+                context.bot,
+                chat_id,
+                "Пока ты один используешь бота. Но ты всё равно молодец."
+            )
+        
+        logger.info(f"Пользователь {chat_id} отправил broadcast {sent_count} получателям")
     
     elif text == "😔 Тяжело":
         context.user_data['awaiting_relapse_confirm'] = True
