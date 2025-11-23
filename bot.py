@@ -189,7 +189,7 @@ async def clean_chat(bot, chat_id):
         except Exception as e:
             logger.debug(f"Не удалось удалить сообщение {msg_id}: {e}")
 
-async def send_with_autodelete(bot, chat_id, text, delay_seconds=10, reply_markup=None, no_delete=False):
+async def send_with_autodelete(bot, chat_id, text, delay_seconds=60, reply_markup=None, no_delete=False):
     """Отправляет сообщение и планирует его удаление"""
     msg = await bot.send_message(chat_id, text, reply_markup=reply_markup)
     
@@ -349,8 +349,8 @@ async def reset_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_with_autodelete(
         context.bot,
         chat_id,
-        "Счётчик обнулён. Начинаем заново.",
-        delay_seconds=10
+        "Счётчик обнулён. Начинаем заново."
+        # 60 сек по умолчанию
     )
     logger.info(f"Пользователь {chat_id} сбросил счётчик")
 
@@ -371,9 +371,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             pass
     else:
-        # Для остальных кнопок - удаляем через 10 секунд
+        # Для остальных кнопок - удаляем через 60 секунд
         async def delete_user_msg():
-            await asyncio.sleep(10)
+            await asyncio.sleep(60)
             try:
                 await context.bot.delete_message(chat_id, user_message_id)
             except:
@@ -389,7 +389,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for i, resp in enumerate(responses):
             if i > 0:
                 await asyncio.sleep(random.uniform(1.0, 2.0))
-            await send_with_autodelete(context.bot, chat_id, resp, delay_seconds=10)
+            await send_with_autodelete(context.bot, chat_id, resp)  # 60 сек по умолчанию
     
     elif text == "😔 Тяжело":
         context.user_data['awaiting_relapse_confirm'] = True
@@ -397,8 +397,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.bot,
             chat_id,
             "Брат, ты сорвался?",
-            delay_seconds=30,
-            reply_markup=get_relapse_keyboard()
+            reply_markup=get_relapse_keyboard()  # 60 сек по умолчанию
         )
     
     elif text == "📊 Дни":
@@ -409,7 +408,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             msg_text = "Прошёл 1 день"
         else:
             msg_text = f"Прошло {days} дней"
-        await send_with_autodelete(context.bot, chat_id, msg_text, delay_seconds=10)
+        await send_with_autodelete(context.bot, chat_id, msg_text)  # 60 сек по умолчанию
     
     elif text == "⏸ Пауза":
         await stop(update, context)
@@ -422,8 +421,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 context.bot,
                 chat_id,
                 "Ничего страшного. Начнём снова.",
-                delay_seconds=10,
-                reply_markup=get_main_keyboard()
+                reply_markup=get_main_keyboard()  # 60 сек по умолчанию
             )
             logger.info(f"Пользователь {chat_id} подтвердил срыв")
         elif text == "Нет":
@@ -432,8 +430,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 context.bot,
                 chat_id,
                 random.choice(responses),
-                delay_seconds=10,
-                reply_markup=get_main_keyboard()
+                reply_markup=get_main_keyboard()  # 60 сек по умолчанию
             )
         context.user_data['awaiting_relapse_confirm'] = False
 
