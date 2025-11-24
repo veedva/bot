@@ -315,7 +315,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_message(context.bot, chat_id, second)
         return
 
-elif text == "☕ Спасибо":
+    elif text == "☕ Спасибо":
         await send_message(
             context.bot, chat_id,
             "Спасибо, брат, что оценил. ❤️\n\n"
