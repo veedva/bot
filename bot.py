@@ -239,11 +239,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data[str(chat_id)]["active"] = True
     save_user_data(data)
 
-    await send_message(
-        context.bot, chat_id,
-        "Привет.\nЯ буду писать тебе время от времени. Диалоги стираются каждую ночь.\n\nДержись. Не сегодня.",
-        save_for_deletion=False
-    )
+await send_message(
+    context.bot, chat_id,
+    "Привет.\n\n"
+    "Этот бот будет писать тебе 3 раза в день — коротко и по делу.\n\n"
+    "Просто чтобы ты помнил свою цель и не расслаблялся.\n\n"
+    "Никаких лекций. Никаких вопросов.\n"
+    "Если сорвёшься — нажмёшь «Да», и начнём заново. Ничего страшного.\n\n"
+    "Чат чистится каждую ночь. Никто ничего не увидит.\n\n"
+    "Держись. Не сегодня.",
+    save_for_deletion=False
+)
 
     for name in [f"morning_{chat_id}", f"evening_{chat_id}", f"night_{chat_id}", f"midnight_{chat_id}"]:
         for job in context.job_queue.get_jobs_by_name(name):
