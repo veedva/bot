@@ -1,26 +1,12 @@
-"""
-Переписанная версия бота — Вариант B (UX + аккуратная чистка кода)
-Сохранены все тексты и логика, но:
-- Единая reply-клавиатура (не меняется)
-- Меню "Тяжело" и другие доп. меню — через InlineKeyboard (не дергают чат)
-- Более надёжная отправка сообщений с обработкой ошибок и деактивацией пользователей
-- Бродкаст "✊" сделан с ограничением параллелизма
-- Центральная функция отправки send_safe
-- Состояния хранятся в JSON, но код подготовлен к миграции на SQLite
-- CallbackQueryHandler для inline-кнопок
-
-Примечание: этот файл оставляет JSON как хранилище по желанию (вариант B). Для больших нагрузок рекомендую миграцию на SQLite (вариант C).
-"""
-
 import logging
 import random
 import json
 import os
 import asyncio
-from datetime import datetime, date, time as dtime
+from datetime import datetime, time
 from filelock import FileLock
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 import pytz
 
 logging.basicConfig(format='%(asctime)s — %(levelname)s — %(message)s', level=logging.INFO)
@@ -34,170 +20,163 @@ DATA_FILE = "user_data.json"
 LOCK_FILE = DATA_FILE + ".lock"
 MOSCOW_TZ = pytz.timezone('Europe/Moscow')
 
-# ----- Контент (оставлен как у тебя, можно править) -----
+# Сообщения
 MORNING_MESSAGES = [
     "Привет. Давай сегодня не будем, хорошо?", "Доброе утро, брат. Не сегодня.", "Привет. Держимся сегодня, да?",
-    "Доброе. Сегодня дел много, нет наверное.", "Привет. Держимся сегодня, да?", "Утро. Давай только не сегодня."
+    "Доброе. Сегодня дел много, нет наверное.", "Привет. Сегодня обойдёмся и так пиздец.", "Утро. Давай только не сегодня.",
+    "Привет, брат. Сегодня пожалуй что ну его нахуй знаешь.", "Доброе утро. Не сегодня же.", "Привет. Сегодня точно не надо.",
+    "Доброе! Давай сегодня без этого.", "Утро. Денег жалко да и ну его.", "Привет. Сегодня легко обойдёмся.",
+    "Братан, доброе. Сегодня точно нет.", "Эй. Сегодня не в тему.", "Доброе утро. Только не сегодня.",
+    "Привет. Может завтра, но сегодня нет.", "Утро. Сегодня спокойно обходимся.", "Эй. Сегодня не стоит."
 ]
+
 EVENING_MESSAGES = [
     "Брат, не сегодня. Держись.", "Эй, я тут. Давай не сегодня.", "Привет. Сегодня держимся, помнишь?",
-    "Брат, держись. Сегодня нет.", "Эй. Ещё чуть-чуть. Не сегодня."
+    "Брат, держись. Сегодня нет.", "Эй. Ещё чуть-чуть. Не сегодня.", "Я с тобой. Сегодня точно нет.",
+    "Привет. Давай обойдёмся.", "Брат, мы же решили — не сегодня.", "Держись там. Сегодня мимо.",
+    "Привет. Сегодня пропустим.", "Эй. Сегодня точно можно без этого.", "Братан, сегодня не надо.",
+    "Привет. Может завтра, сегодня мимо.", "Как дела? Сегодня обойдёмся.", "Эй, брат. Сегодня не будем.",
+    "Привет. Сегодня точно ни к чему.", "Братан, ну может завтра, а сегодня нет?"
 ]
+
 NIGHT_MESSAGES = [
-    "Ты молодец. До завтра.", "Красавчик. Спокойной.", "Держался сегодня. Уважаю.", "Сегодня справились. До завтра."
+    "Ты молодец. До завтра.", "Красавчик. Спокойной.", "Держался сегодня. Уважаю.", "Сегодня справились. До завтра.",
+    "Молодец, держишься.", "Ещё один день позади.", "Ты сильный. До завтра.", "Сегодня получилось. Отдыхай.",
+    "Справился. Уважение.", "Держался весь день. Красава.", "Нормально прошёл день.", "Сегодня справились. Отдыхай.",
+    "Ещё один день прошёл. До завтра.", "Держались сегодня. Молодцы.", "День зачётный. Спокойной.",
+    "Справились. До завтра.", "Сегодня получилось. Отдыхай."
 ]
-MILESTONES = {3: "Три дня уже. Неплохо идём.", 7: "Неделя прошла. Продолжаем.", 14: "Две недели! Хорошо идёт.",
-              30: "Месяц. Серьёзно уважаю.", 60: "Два месяца. Сильный результат.", 90: "Три месяца! Ты реально крутой.",
-              180: "Полгода. Это впечатляет.", 365: "Год. Легенда."}
+
+MILESTONES = {
+    3: "Три дня уже. Неплохо идём.", 7: "Неделя прошла. Продолжаем.", 14: "Две недели! Хорошо идёт.",
+    30: "Месяц. Серьёзно уважаю.", 60: "Два месяца. Сильный результат.", 90: "Три месяца! Ты реально крутой.",
+    180: "Полгода. Это впечатляет.", 365: "Год. Легенда."
+}
 
 HELP_TECHNIQUES = [
-    "Дыши так: вдох носом 4 сек → задержи 4 → выдох ртом 4 → задержи 4. 6–8 раз.",
-    "Падай и делай 25 отжиманий или приседаний до жжения.",
-    "Ледяная вода на лицо и шею — 30 секунд.",
-    "Выйди на балкон. Просто стой и дыши 3–5 минут.",
-    "Пей ледяную воду медленно, маленькими глотками.",
-    "Напиши в заметки 3 вещи, за которые сегодня благодарен.",
-    "Съешь лимон, горчицу, имбирь, перец — что угодно острое или кислое.",
-    "Ходи быстрым шагом по квартире 3 минуты под любой трек.",
+    "Дыши так: вдох носом 4 сек → задержи дыхание и считай до 4 → выдох ртом 4 секунды → задержи дыхание считай до 4. Повтори 6–8 раз. Тяга уходит за минуту — работает всегда.",
+    "Падай и делай 25 отжиманий или приседаний до жжения. Пока мышцы горят — мозг забывает про всё.",
+    "Ледяная вода на лицо и шею — 30 секунд. Шок — и тяга отпустила.",
+    "Выйди на балкон. Просто стой и дыши 3–5 минут. Даже в мороз.",
+    "Пей ледяную воду медленно, маленькими глотками. Пока пьёшь — отпускает.",
+    "Напиши в заметки 3 вещи, за которые сегодня благодарен. Хоть «я живой». Мозг переключается.",
+    "Съешь лимон, горчицу, имбирь, перец — что угодно острое или кислое. Жжёт рот — башка молчит.",
+    "Ходи быстрым шагом по квартире 3 минуты под любой трек. Главное — не стой.",
     "Сядь ровно, закрой глаза, дыши. Минута тишины — как перезагрузка.",
-    "Поставь таймер на 10 минут и скажи: «Подожду, потом решу»."
+    "Покрути плечами, разомни шею. Напряжение уходит — тревога тоже.",
+    "Поставь таймер на 10 минут и скажи: «Подожду, потом решу». В 95% случаев через 10 минут уже не надо.",
+    "Посмотри в зеркало и скажи вслух: «Я сильнее этой хуйни». Да, тупо звучит. Но работает."
 ]
 
-# ----- Новая единая reply-клавиатура (не меняется) -----
-REPLY_KEYBOARD = ReplyKeyboardMarkup([
-    [KeyboardButton("👋 Ты тут?"), KeyboardButton("✊ Держусь")],
-    [KeyboardButton("😔 Тяжело"), KeyboardButton("📊 Дни")],
-    [KeyboardButton("⏸ Пауза")]
-], resize_keyboard=True)
+# Клавиатуры — жёстко, по-мужски
+def get_main_keyboard():
+    return ReplyKeyboardMarkup([
+        [KeyboardButton("✊ Держусь")],
+        [KeyboardButton("😔 Тяжело"), KeyboardButton("📊 Дни")],
+        [KeyboardButton("👋 Ты тут?"), KeyboardButton("⏸ Пауза")],
+        [KeyboardButton("❤️ Спасибо")]
+    ], resize_keyboard=True)
 
-# ----- Inline клавиатуры (динамически создаются) -----
-def heavy_menu_inline():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("Помочь себе", callback_data="help_self")],
-        [InlineKeyboardButton("Срыв", callback_data="relapse"), InlineKeyboardButton("Чуть не сорвался", callback_data="almost")],
-        [InlineKeyboardButton("Назад", callback_data="back")]
-    ])
+def get_start_keyboard():
+    return ReplyKeyboardMarkup([[KeyboardButton("▶ Начать")]], resize_keyboard=True)
 
-def one_more_help_inline():
-    return InlineKeyboardMarkup([[InlineKeyboardButton("Ещё способ", callback_data="more_help")], [InlineKeyboardButton("Назад", callback_data="back")]])
+def get_heavy_keyboard():
+    return ReplyKeyboardMarkup([
+        [KeyboardButton("Помочь себе")],
+        [KeyboardButton("Срыв"), KeyboardButton("Чуть не сорвался")],
+        [KeyboardButton("Назад")]
+    ], resize_keyboard=True)
 
-# ----- Работа с данными (пока JSON с блокировкой) -----
+def get_one_more_help_keyboard():
+    return ReplyKeyboardMarkup([[KeyboardButton("Ещё способ"), KeyboardButton("Назад")]], resize_keyboard=True)
 
+# Данные
 def load_user_data():
     with FileLock(LOCK_FILE):
         if os.path.exists(DATA_FILE):
             try:
                 with open(DATA_FILE, "r", encoding="utf-8") as f:
                     return json.load(f)
-            except Exception as e:
-                logger.exception("Ошибка чтения данных, возвращаю пустой словарь: %s", e)
+            except:
                 return {}
         return {}
-
 
 def save_user_data(data):
     with FileLock(LOCK_FILE):
         with open(DATA_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
 
-# ----- Вспомогательные функции -----
-
 def get_days_count(user_id):
     data = load_user_data()
     user_str = str(user_id)
     if user_str in data and "start_date" in data[user_str]:
-        try:
-            start = datetime.fromisoformat(data[user_str]["start_date"])
-            return (datetime.now() - start).days
-        except Exception:
-            return 0
+        return (datetime.now() - datetime.fromisoformat(data[user_str]["start_date"])).days
     return 0
-
 
 def reset_counter(user_id):
     data = load_user_data()
     user_str = str(user_id)
     current = get_days_count(user_id)
-    best = data.get(user_str, {}).get("best_streak", 0)
+    best = data[user_str].get("best_streak", 0)
     if current > best:
-        data.setdefault(user_str, {})["best_streak"] = current
-    data.setdefault(user_str, {})["start_date"] = datetime.now().isoformat()
+        data[user_str]["best_streak"] = current
+    data[user_str]["start_date"] = datetime.now().isoformat()
     save_user_data(data)
-
 
 def get_all_active_users():
     return [int(uid) for uid, info in load_user_data().items() if info.get("active")]
 
-# ----- Отправка сообщений с обработкой ошибок -----
-
-async def send_safe(bot, chat_id, text, reply_markup=None, save_for_deletion=True):
-    """Отправляет сообщение, аккуратно обрабатывает ошибки и деактивирует юзера при запрете"""
-    markup = reply_markup or REPLY_KEYBOARD
-    try:
-        msg = await bot.send_message(chat_id=chat_id, text=text, reply_markup=markup)
-        if save_for_deletion:
-            data = load_user_data()
-            str_id = str(chat_id)
-            data.setdefault(str_id, {}).setdefault("message_ids", []).append(msg.message_id)
-            save_user_data(data)
-        return msg
-    except Exception as e:
-        # Если ошибка — возможно пользователь заблокировал бота
-        logger.warning("Не удалось отправить сообщение %s: %s", chat_id, e)
-        # Пробуем пометить пользователя неактивным
-        try:
-            data = load_user_data()
-            if str(chat_id) in data:
-                data[str(chat_id)]["active"] = False
-                save_user_data(data)
-        except Exception:
-            logger.exception("Ошибка при попытке обновить статус пользователя")
-        return None
-
-# ----- Обновление закрепленного прогресса (без ошибок) -----
+# Закреплённое
 async def update_pinned_progress(bot, chat_id):
     days = get_days_count(chat_id)
     best = load_user_data().get(str(chat_id), {}).get("best_streak", 0)
     text = f"День {days} • Лучший стрик: {best}"
     data = load_user_data()
     user_str = str(chat_id)
-    pinned_id = data.get(user_str, {}).get("pinned_message_id")
+    pinned_id = data[user_str].get("pinned_message_id")
     try:
         if pinned_id:
             await bot.edit_message_text(chat_id=chat_id, message_id=pinned_id, text=text)
         else:
             msg = await bot.send_message(chat_id=chat_id, text=text)
-            try:
-                await bot.pin_chat_message(chat_id=chat_id, message_id=msg.message_id, disable_notification=True)
-                data.setdefault(user_str, {})["pinned_message_id"] = msg.message_id
-                save_user_data(data)
-            except Exception:
-                # Если не получилось запинить — не фатально
-                pass
-    except Exception:
-        logger.exception("Ошибка при обновлении pinned progress")
+            await bot.pin_chat_message(chat_id=chat_id, message_id=msg.message_id, disable_notification=True)
+            data[user_str]["pinned_message_id"] = msg.message_id
+            save_user_data(data)
+    except:
+        pass
 
-# ----- Job callbacks (утро/вечер/ночь/очистка) -----
+# Отправка
+async def send_message(bot, chat_id, text, reply_markup=None, save_for_deletion=True):
+    markup = reply_markup or get_main_keyboard()
+    msg = await bot.send_message(chat_id=chat_id, text=text, reply_markup=markup)
+    if save_for_deletion:
+        data = load_user_data()
+        str_id = str(chat_id)
+        data.setdefault(str_id, {}).setdefault("message_ids", []).append(msg.message_id)
+        save_user_data(data)
+    return msg
+
+# Рассылки
 async def send_morning_message(context: ContextTypes.DEFAULT_TYPE):
     chat_id = context.job.chat_id
     if not load_user_data().get(str(chat_id), {}).get("active"):
         return
     days = get_days_count(chat_id)
     text = MILESTONES.get(days, random.choice(MORNING_MESSAGES))
-    await send_safe(context.bot, chat_id, text)
+    await send_message(context.bot, chat_id, text)
     await update_pinned_progress(context.bot, chat_id)
 
 async def send_evening_message(context: ContextTypes.DEFAULT_TYPE):
     chat_id = context.job.chat_id
     if not load_user_data().get(str(chat_id), {}).get("active"):
         return
-    await send_safe(context.bot, chat_id, random.choice(EVENING_MESSAGES))
+    await send_message(context.bot, chat_id, random.choice(EVENING_MESSAGES))
 
 async def send_night_message(context: ContextTypes.DEFAULT_TYPE):
     chat_id = context.job.chat_id
     if not load_user_data().get(str(chat_id), {}).get("active"):
         return
-    await send_safe(context.bot, chat_id, random.choice(NIGHT_MESSAGES))
+    await send_message(context.bot, chat_id, random.choice(NIGHT_MESSAGES))
     await update_pinned_progress(context.bot, chat_id)
 
 async def midnight_clean_chat(context: ContextTypes.DEFAULT_TYPE):
@@ -205,16 +184,16 @@ async def midnight_clean_chat(context: ContextTypes.DEFAULT_TYPE):
     data = load_user_data()
     user_str = str(chat_id)
     ids = data.get(user_str, {}).get("message_ids", [])
-    data.setdefault(user_str, {})["message_ids"] = []
+    data[user_str]["message_ids"] = []
     save_user_data(data)
     for msg_id in ids:
         try:
             await context.bot.delete_message(chat_id, msg_id)
-            await asyncio.sleep(0.02)
-        except Exception:
+            await asyncio.sleep(0.05)
+        except:
             pass
 
-# ----- Handlers -----
+# Старт
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     data = load_user_data()
@@ -228,59 +207,33 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     })
     save_user_data(data)
 
-    await send_safe(context.bot, chat_id,
-        "Привет, брат.\n\nЯ буду писать три раза в день, чтобы просто напомнить: сегодня не надо.\n\nКогда тяжело — жми «✊ Держусь».\nТе, кто тоже борятся — получат пуш. Увидят, что ты есть и не сдаешься.",
-        save_for_deletion=False)
+    await send_message(context.bot, chat_id,
+        "Привет, брат.\n\n"
+        "Я буду писать три раза в день — просто напомню: сегодня не надо.\n\n"
+        "Когда тяжело — жми «✊ Держусь».\n"
+        "Все, кто тоже в деле, получат пуш. Без слов. Просто узнают, что ты ещё здесь.\n"
+        "Можешь жать до 5 раз в день, если совсем пиздец.\n\n"
+        "Держись.",
+        save_for_deletion=False
+    )
     await update_pinned_progress(context.bot, chat_id)
 
-    # Удаляем старые джобы
     for name in [f"morning_{chat_id}", f"evening_{chat_id}", f"night_{chat_id}", f"midnight_{chat_id}"]:
         for job in context.job_queue.get_jobs_by_name(name):
             job.schedule_removal()
 
-    context.job_queue.run_daily(send_morning_message, dtime(9, 0, tzinfo=MOSCOW_TZ), chat_id=chat_id, name=f"morning_{chat_id}")
-    context.job_queue.run_daily(send_evening_message, dtime(18, 0, tzinfo=MOSCOW_TZ), chat_id=chat_id, name=f"evening_{chat_id}")
-    context.job_queue.run_daily(send_night_message, dtime(23, 0, tzinfo=MOSCOW_TZ), chat_id=chat_id, name=f"night_{chat_id}")
-    context.job_queue.run_daily(midnight_clean_chat, dtime(0, 1, tzinfo=MOSCOW_TZ), chat_id=chat_id, name=f"midnight_{chat_id}")
+    context.job_queue.run_daily(send_morning_message, time(9, 0, tzinfo=MOSCOW_TZ), chat_id=chat_id, name=f"morning_{chat_id}")
+    context.job_queue.run_daily(send_evening_message, time(18, 0, tzinfo=MOSCOW_TZ), chat_id=chat_id, name=f"evening_{chat_id}")
+    context.job_queue.run_daily(send_night_message, time(23, 0, tzinfo=MOSCOW_TZ), chat_id=chat_id, name=f"night_{chat_id}")
+    context.job_queue.run_daily(midnight_clean_chat, time(0, 1, tzinfo=MOSCOW_TZ), chat_id=chat_id, name=f"midnight_{chat_id}")
 
-async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    data = load_user_data()
-    user_str = str(chat_id)
-    if user_str in data:
-        data[user_str]["active"] = False
-        data[user_str]["state"] = "normal"
-        save_user_data(data)
-
-    for name in [f"morning_{chat_id}", f"evening_{chat_id}", f"night_{chat_id}", f"midnight_{chat_id}"]:
-        for job in context.job_queue.get_jobs_by_name(name):
-            job.schedule_removal()
-
-    await send_safe(context.bot, chat_id, "Остановлено. Жми ▶ Начать, когда будешь готов.", reply_markup=ReplyKeyboardMarkup([[KeyboardButton("▶ Начать")]], resize_keyboard=True), save_for_deletion=False)
-
-# ----- Обработка "держусь" — теперь с ограниченным параллелизмом -----
-BROADCAST_CONCURRENCY = 12  # одновременных отправок при бродкасте
-
-async def broadcast_hold(context, origin_chat_id):
-    users = get_all_active_users()
-    sem = asyncio.Semaphore(BROADCAST_CONCURRENCY)
-    async def send_to(uid):
-        if uid == origin_chat_id:
-            return
-        async with sem:
-            try:
-                await context.bot.send_message(uid, "✊")
-            except Exception:
-                # тихо игнорируем — send_safe при следующей отправке пометит неактивным
-                pass
-    await asyncio.gather(*(send_to(u) for u in users))
-
-async def handle_hold_button(chat_id, context: ContextTypes.DEFAULT_TYPE):
+# Держусь — до 5 раз в день, не чаще чем раз в 30 минут
+async def handle_hold_button(chat_id, context):
     data = load_user_data()
     user_str = str(chat_id)
     data.setdefault(user_str, {})
 
-    today = date.today()
+    today = datetime.now().date()
     last_date = data[user_str].get("hold_date")
     last_time = data[user_str].get("hold_time")
     count = data[user_str].get("hold_count", 0)
@@ -289,122 +242,104 @@ async def handle_hold_button(chat_id, context: ContextTypes.DEFAULT_TYPE):
         count = 0
 
     if last_time:
-        try:
-            last_dt = datetime.fromisoformat(last_time)
-            if (datetime.now() - last_dt).total_seconds() < 1800:
-                await send_safe(context.bot, chat_id, "Погоди ещё немного, брат. Только что было.")
-                return
-        except Exception:
-            pass
+        last_dt = datetime.fromisoformat(last_time)
+        if (datetime.now() - last_dt).total_seconds() < 1800:
+            await send_message(context.bot, chat_id, "Погоди ещё немного, брат. Только что было.")
+            return
 
     if count >= 5:
-        await send_safe(context.bot, chat_id, "Сегодня это уже 5 раз. ✊\nЗавтра снова сможешь.")
+        await send_message(context.bot, chat_id, "Сегодня уже 5 раз. Ты реально держишься, брат. Горжусь тобой. ✊\nЗавтра снова сможешь.")
         return
 
-    await send_safe(context.bot, chat_id, random.choice(["Отправлено, молодец! ✊", "Горжусь! ✊", "Красава. ✊"]))
+    await send_message(context.bot, chat_id, random.choice([
+        "Принял. ✊", "Молодец. ✊", "Красава. ✊", "Сила. ✊", "Так держать. ✊"
+    ]), save_for_deletion=False)
 
-    # Бродкаст с ограничением параллелизма
-    try:
-        await broadcast_hold(context, chat_id)
-    except Exception:
-        logger.exception("Ошибка при бродкасте держимся")
+    for uid in get_all_active_users():
+        if uid != chat_id:
+            try:
+                await context.bot.send_message(uid, "✊")
+                await asyncio.sleep(0.08)
+            except:
+                pass
 
     data[user_str]["hold_time"] = datetime.now().isoformat()
     data[user_str]["hold_date"] = str(today)
     data[user_str]["hold_count"] = count + 1
     save_user_data(data)
 
-# ----- Обработка текстовых сообщений (основная клавиатура не меняется) -----
+# Обработка сообщений
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message:
-        return
     text = update.message.text.strip()
     chat_id = update.effective_chat.id
     user_str = str(chat_id)
     data = load_user_data()
     state = data.get(user_str, {}).get("state", "normal")
 
-    # Вариант: при переходе в heavy меню показываем inline-клавиатуру
+    if state == "heavy_menu":
+        if text == "Помочь себе":
+            await send_message(context.bot, chat_id, random.choice(HELP_TECHNIQUES), get_one_more_help_keyboard(), False)
+            data[user_str]["state"] = "help_mode"
+            save_user_data(data)
+            return
+        if text == "Срыв":
+            reset_counter(chat_id)
+            await send_message(context.bot, chat_id, "Ничего страшного.\nНачнём заново. Ты молодец, что сказал честно.", get_main_keyboard(), False)
+            await update_pinned_progress(context.bot, chat_id)
+            data[user_str]["state"] = "normal"
+            save_user_data(data)
+            return
+        if text == "Чуть не сорвался":
+            await send_message(context.bot, chat_id, "Красавчик. Это и есть победа. ✊", get_main_keyboard(), False)
+            data[user_str]["state"] = "normal"
+            save_user_data(data)
+            return
+        if text == "Назад":
+            await send_message(context.bot, chat_id, "Держись.", get_main_keyboard(), False)
+            data[user_str]["state"] = "normal"
+            save_user_data(data)
+            return
+
+    if state == "help_mode":
+        if text == "Ещё способ":
+            await send_message(context.bot, chat_id, random.choice(HELP_TECHNIQUES), get_one_more_help_keyboard(), False)
+            return
+        if text == "Назад":
+            await send_message(context.bot, chat_id, "Держись там.", get_main_keyboard(), False)
+            data[user_str]["state"] = "normal"
+            save_user_data(data)
+            return
+
     if text == "▶ Начать":
         await start(update, context)
-        return
-    if text == "👋 Ты тут?":
-        await asyncio.sleep(random.uniform(0.8, 2.0))
-        await send_safe(context.bot, chat_id, random.choice(["Тут.", "Привет.", "Тут, брат."]))
-        await asyncio.sleep(random.uniform(0.4, 1.3))
-        await send_safe(context.bot, chat_id, random.choice(["Не сдаюсь.", "Держусь.", "Мы справимся."]))
-        return
-    if text == "✊ Держусь":
+    elif text == "👋 Ты тут?":
+        await asyncio.sleep(random.uniform(2.8, 5.5))
+        await send_message(context.bot, chat_id, random.choice(["Тут.", "Привет.", "А куда я денусь?", "Тут, брат.", "Ага."]))
+        await asyncio.sleep(random.uniform(2, 4.5))
+        await send_message(context.bot, chat_id, random.choice(["Держусь.", "Я не буду.", "Всё по плану.", "Ты справишься.", "Я рядом."]))
+    elif text == "✊ Держусь":
         await handle_hold_button(chat_id, context)
-        return
-    if text == "😔 Тяжело":
-        # Поменяли на inline-меню
-        await send_safe(context.bot, chat_id, "Что будем делать?", reply_markup=heavy_menu_inline(), save_for_deletion=False)
-        data.setdefault(user_str, {})["state"] = "heavy_menu"
+    elif text == "😔 Тяжело":
+        data[user_str]["state"] = "heavy_menu"
         save_user_data(data)
-        return
-    if text == "📊 Дни":
+        await send_message(context.bot, chat_id, "Что будем делать?", get_heavy_keyboard(), False)
+    elif text == "📊 Дни":
         days = get_days_count(chat_id)
         msg = "Первый день." if days == 0 else "Прошёл 1 день." if days == 1 else f"Прошло {days} дней."
-        await send_safe(context.bot, chat_id, msg)
-        return
-    if text == "❤️ Спасибо":
-        await send_safe(context.bot, chat_id,
+        await send_message(context.bot, chat_id, msg)
+    elif text == "❤️ Спасибо":
+        await send_message(context.bot, chat_id,
             "Спасибо, брат. ❤️\n\nЕсли хочешь поддержать:\nСбер 2202 2084 3481 5313\n\nГлавное — держись.",
             save_for_deletion=False)
-        return
-    if text == "⏸ Пауза":
+    elif text == "⏸ Пауза":
         await stop(update, context)
-        return
 
-    # Фоллбэк — подсказываем, что есть кнопки
-    await send_safe(context.bot, chat_id, "Я тут, брат. Нажми на кнопки внизу — они помогут.")
-
-# ----- CallbackQueryHandler для inline кнопок -----
-async def handle_callback(query, context: ContextTypes.DEFAULT_TYPE):
-    data = load_user_data()
-    chat_id = query.message.chat.id
-    user_str = str(chat_id)
-    state = data.get(user_str, {}).get("state", "normal")
-
-    await query.answer()
-    code = query.data
-
-    if code == "help_self":
-        # покажем технику
-        await query.message.reply_text(random.choice(HELP_TECHNIQUES), reply_markup=one_more_help_inline())
-        data.setdefault(user_str, {})["state"] = "help_mode"
-        save_user_data(data)
-        return
-    if code == "more_help":
-        await query.message.reply_text(random.choice(HELP_TECHNIQUES), reply_markup=one_more_help_inline())
-        return
-    if code == "relapse":
-        reset_counter(chat_id)
-        await query.message.reply_text("Ничего страшного.\nНачнём заново. Ты молодец, что сказал честно.", reply_markup=REPLY_KEYBOARD)
-        await update_pinned_progress(context.bot, chat_id)
-        data.setdefault(user_str, {})["state"] = "normal"
-        save_user_data(data)
-        return
-    if code == "almost":
-        await query.message.reply_text("Красавчик. Это и есть победа. ✊", reply_markup=REPLY_KEYBOARD)
-        data.setdefault(user_str, {})["state"] = "normal"
-        save_user_data(data)
-        return
-    if code == "back":
-        await query.message.reply_text("Держись.", reply_markup=REPLY_KEYBOARD)
-        data.setdefault(user_str, {})["state"] = "normal"
-        save_user_data(data)
-        return
-
-# ----- Запуск приложения -----
-
+# Запуск
 def main():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    app.add_handler(CallbackQueryHandler(handle_callback))
-    logger.info("Кент на посту ✊ — Вариант B")
+    logger.info("Кент на посту ✊")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
