@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 TOKEN = os.getenv("BOT_TOKEN")
 if not TOKEN:
-    raise ValueError("BOT_TOKEN не установлен!")
+    raise ValueError("BOT_TOKEN не установлен! Установите переменную окружения BOT_TOKEN")
 
 DATA_FILE = "user_data.json"
 LOCK_FILE = DATA_FILE + ".lock"
@@ -33,7 +33,7 @@ MORNING_MESSAGES = [
     "Доброе. Сегодня дел много, нет наверное.",
     "Привет. Сегодня обойдёмся и так пиздец.",
     "Утро. Давай только не сегодня.",
-    "Привет, брат. Сегодня мимо.",
+    "Привет, брат. Сегодня пожалуй что ну его нахуй знаешь.",
     "Доброе утро. Не сегодня же.",
     "Привет. Сегодня точно не надо.",
     "Доброе! Давай сегодня без этого.",
@@ -105,7 +105,7 @@ def get_main_keyboard():
     keyboard = [
         [KeyboardButton("👋 Ты тут?"), KeyboardButton("😔 Тяжело")],
         [KeyboardButton("💪 Держитесь!"), KeyboardButton("📊 Дни")],
-        [KeyboardButton("☕ Спасибо"), KeyboardButton("⏸ Пауза")]
+        [KeyboardButton("❤️ Спасибо"), KeyboardButton("⏸ Пауза")]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
@@ -121,9 +121,12 @@ def get_relapse_keyboard():
 def load_user_data():
     with FileLock(LOCK_FILE):
         if os.path.exists(DATA_FILE):
-            with open(DATA_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-    return {}
+            try:
+                with open(DATA_FILE, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except json.JSONDecodeError:
+                return {}
+        return {}
 
 def save_user_data(data):
     with FileLock(LOCK_FILE):
@@ -132,30 +135,34 @@ def save_user_data(data):
 
 def get_days_count(user_id):
     data = load_user_data()
-    if str(user_id) in data and "start_date" in data[str(user_id)]:
-        start_date = datetime.fromisoformat(data[str(user_id)]["start_date"])
+    user_str = str(user_id)
+    if user_str in data and "start_date" in data[user_str]:
+        start_date = datetime.fromisoformat(data[user_str]["start_date"])
         return (datetime.now() - start_date).days
     return 0
 
 def reset_counter(user_id):
     data = load_user_data()
-    if str(user_id) not in data:
-        data[str(user_id)] = {}
-    data[str(user_id)]["start_date"] = datetime.now().isoformat()
+    user_str = str(user_id)
+    if user_str not in data:
+        data[user_str] = {}
+    data[user_str]["start_date"] = datetime.now().isoformat()
     save_user_data(data)
 
 def can_broadcast_today(user_id):
     data = load_user_data()
-    if str(user_id) not in data or "last_broadcast" not in data[str(user_id)]:
+    user_str = str(user_id)
+    if "last_broadcast" not in data.get(user_str, {}):
         return True
-    last = datetime.fromisoformat(data[str(user_id)]["last_broadcast"])
+    last = datetime.fromisoformat(data[user_str]["last_broadcast"])
     return last.date() < datetime.now().date()
 
 def mark_broadcast_sent(user_id):
     data = load_user_data()
-    if str(user_id) not in data:
-        data[str(user_id)] = {}
-    data[str(user_id)]["last_broadcast"] = datetime.now().isoformat()
+    user_str = str(user_id)
+    if user_str not in data:
+        data[user_str] = {}
+    data[user_str]["last_broadcast"] = datetime.now().isoformat()
     save_user_data(data)
 
 def get_all_active_users():
@@ -163,16 +170,19 @@ def get_all_active_users():
     return [int(uid) for uid, ud in data.items() if ud.get("active", False)]
 
 # =====================================================
-# Очистка чата ночью
+# Очистка чата ночью (только временные сообщения)
 # =====================================================
 async def midnight_clean_chat(context: ContextTypes.DEFAULT_TYPE):
     chat_id = context.job.chat_id
     data = load_user_data()
-    if str(chat_id) not in data or "message_ids" not in data[str(chat_id)]:
+    user_str = str(chat_id)
+    if user_str not in data or "message_ids" not in data[user_str]:
         return
-    message_ids = data[str(chat_id)]["message_ids"]
-    data[str(chat_id)]["message_ids"] = []
+
+    message_ids = data[user_str]["message_ids"]
+    data[user_str]["message_ids"] = []
     save_user_data(data)
+
     deleted = 0
     for msg_id in message_ids:
         try:
@@ -181,32 +191,33 @@ async def midnight_clean_chat(context: ContextTypes.DEFAULT_TYPE):
             await asyncio.sleep(0.05)
         except:
             pass
-    logger.info(f"Очистил {deleted} сообщений у {chat_id}")
+    logger.info(f"Очистил {deleted} сообщений у пользователя {chat_id}")
 
 # =====================================================
-# Отправка сообщений (клавиатура не мигает)
+# Отправка сообщений
 # =====================================================
 async def send_message(bot, chat_id, text, reply_markup=None, save_for_deletion=True):
-    final_markup = reply_markup if reply_markup is not None else get_main_keyboard()
-    msg = await bot.send_message(chat_id, text, reply_markup=final_markup)
+    final_markup = reply_markup or get_main_keyboard()
+    msg = await bot.send_message(chat_id=chat_id, text=text, reply_markup=final_markup)
+
     if save_for_deletion:
         data = load_user_data()
-        str_id = str(chat_id)
-        if str_id not in data:
-            data[str_id] = {}
-        if "message_ids" not in data[str_id]:
-            data[str_id]["message_ids"] = []
-        data[str_id]["message_ids"].append(msg.message_id)
+        user_str = str(chat_id)
+        if user_str not in data:
+            data[user_str] = {}
+        data[user_str].setdefault("message_ids", [])
+        data[user_str]["message_ids"].append(msg.message_id)
         save_user_data(data)
     return msg
 
 # =====================================================
-# Уведомления
+# Рассылки
 # =====================================================
 async def send_morning_message(context: ContextTypes.DEFAULT_TYPE):
     chat_id = context.job.chat_id
     data = load_user_data()
-    if not data.get(str(chat_id), {}).get("active", False):
+    user_str = str(chat_id)
+    if not data.get(user_str, {}).get("active", False):
         return
     days = get_days_count(chat_id)
     text = MILESTONES.get(days, random.choice(MORNING_MESSAGES))
@@ -215,7 +226,8 @@ async def send_morning_message(context: ContextTypes.DEFAULT_TYPE):
 async def send_evening_message(context: ContextTypes.DEFAULT_TYPE):
     chat_id = context.job.chat_id
     data = load_user_data()
-    if not data.get(str(chat_id), {}).get("active", False):
+    user_str = str(chat_id)
+    if not data.get(user_str, {}).get("active", False):
         return
     text = random.choice(EVENING_MESSAGES)
     await send_message(context.bot, chat_id, text)
@@ -223,7 +235,8 @@ async def send_evening_message(context: ContextTypes.DEFAULT_TYPE):
 async def send_night_message(context: ContextTypes.DEFAULT_TYPE):
     chat_id = context.job.chat_id
     data = load_user_data()
-    if not data.get(str(chat_id), {}).get("active", False):
+    user_str = str(chat_id)
+    if not data.get(user_str, {}).get("active", False):
         return
     text = random.choice(NIGHT_MESSAGES)
     await send_message(context.bot, chat_id, text)
@@ -234,41 +247,48 @@ async def send_night_message(context: ContextTypes.DEFAULT_TYPE):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     data = load_user_data()
-    if str(chat_id) not in data:
-        data[str(chat_id)] = {}
-    if "start_date" not in data[str(chat_id)]:
-        data[str(chat_id)]["start_date"] = datetime.now().isoformat()
-    data[str(chat_id)]["active"] = True
+    user_str = str(chat_id)
+    if user_str not in data:
+        data[user_str] = {}
+
+    data[user_str]["start_date"] = datetime.now().isoformat()
+    data[user_str]["active"] = True
+    data[user_str]["awaiting_relapse"] = False
     save_user_data(data)
 
     await send_message(
         context.bot, chat_id,
         "Привет.\n\n"
         "Я буду писать три раза в день, просто чтобы напомнить: сегодня — не надо.\n\n"
-        "Если нажмёшь 💪 Держитесь! — всем остальным придёт пуш. Просто чтобы знали: они не одни.\n\n"
+        "Если нажмёшь 🔥 Держитесь! — всем остальным придёт пуш. Просто чтобы знали: они не одни.\n\n"
         "Чат чистится каждую ночь. Всё строго между нами.\n\n"
         "Держись.",
         save_for_deletion=False
     )
 
+    # Удаляем старые задачи
     for name in [f"morning_{chat_id}", f"evening_{chat_id}", f"night_{chat_id}", f"midnight_{chat_id}"]:
         for job in context.job_queue.get_jobs_by_name(name):
             job.schedule_removal()
 
-    context.job_queue.run_daily(send_morning_message, time=time(hour=9, minute=0, tzinfo=MOSCOW_TZ), chat_id=chat_id, name=f"morning_{chat_id}")
-    context.job_queue.run_daily(send_evening_message, time=time(hour=18, minute=0, tzinfo=MOSCOW_TZ), chat_id=chat_id, name=f"evening_{chat_id}")
-    context.job_queue.run_daily(send_night_message, time=time(hour=23, minute=0, tzinfo=MOSCOW_TZ), chat_id=chat_id, name=f"night_{chat_id}")
-    context.job_queue.run_daily(midnight_clean_chat, time=time(hour=0, minute=1, tzinfo=MOSCOW_TZ), chat_id=chat_id, name=f"midnight_{chat_id}")
+    # Запускаем новые
+    context.job_queue.run_daily(send_morning_message, time=time(9, 0, tzinfo=MOSCOW_TZ), chat_id=chat_id, name=f"morning_{chat_id}")
+    context.job_queue.run_daily(send_evening_message, time=time(18, 0, tzinfo=MOSCOW_TZ), chat_id=chat_id, name=f"evening_{chat_id}")
+    context.job_queue.run_daily(send_night_message, time=time(23, 0, tzinfo=MOSCOW_TZ), chat_id=chat_id, name=f"night_{chat_id}")
+    context.job_queue.run_daily(midnight_clean_chat, time=time(0, 1, tzinfo=MOSCOW_TZ), chat_id=chat_id, name=f"midnight_{chat_id}")
 
 async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     data = load_user_data()
-    if str(chat_id) in data:
-        data[str(chat_id)]["active"] = False
+    user_str = str(chat_id)
+    if user_str in data:
+        data[user_str]["active"] = False
         save_user_data(data)
+
     for name in [f"morning_{chat_id}", f"evening_{chat_id}", f"night_{chat_id}", f"midnight_{chat_id}"]:
         for job in context.job_queue.get_jobs_by_name(name):
             job.schedule_removal()
+
     await send_message(
         context.bot, chat_id,
         "Напоминания остановлены. Нажми ▶ Начать чтобы возобновить.",
@@ -280,65 +300,74 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Обработка сообщений
 # =====================================================
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
+    text = update.message.text.strip()
     chat_id = update.effective_chat.id
+    user_str = str(chat_id)
+    data = load_user_data()
 
+    # Проверяем, ждём ли ответ на "Сорвался?"
+    if data.get(user_str, {}).get("awaiting_relapse", False):
+        if text == "Да":
+            reset_counter(chat_id)
+            await send_message(context.bot, chat_id, "Ничего страшного. Начнём снова.", reply_markup=get_main_keyboard(), save_for_deletion=False)
+        elif text == "Нет":
+            await send_message(context.bot, chat_id, random.choice([
+                "Красава, держись.", "Молодец.", "Уважаю.", "Ты справишься.", "Так держать, брат."
+            ]), reply_markup=get_main_keyboard(), save_for_deletion=False)
+        
+        data[user_str]["awaiting_relapse"] = False
+        save_user_data(data)
+        return
+
+    # Основные кнопки
     if text == "▶ Начать":
         await start(update, context)
         return
 
-    elif text == "👋 Ты тут?":
+    if text == "👋 Ты тут?":
         await asyncio.sleep(random.uniform(2.8, 5.5))
-        first = random.choice([
+        await send_message(context.bot, chat_id, random.choice([
             "Тут.", "На связи.", "А куда я денусь?", "Здесь.", "Тут, как всегда.",
             "Конечно тут.", "Тут. Дышу.", "На посту.", "Как штык.", "Тут. Не переживай."
-        ])
-        await send_message(context.bot, chat_id, first)
+        ]))
         await asyncio.sleep(random.uniform(2.0, 4.5))
-        second = random.choice([
+        await send_message(context.bot, chat_id, random.choice([
             "Держимся сегодня.", "Сегодня мимо.", "Всё по плану.", "Не сегодня.",
-            "Ты справишься.", "Я рядом.", "Держись.", "Так держать.",
-            "Ты в деле.", "Всё под контролем."
-        ])
-        await send_message(context.bot, chat_id, second)
+            "Ты справишься.", "Я рядом.", "Держись.", "Так держать.", "Ты в деле."
+        ]))
         return
 
-    elif text == "☕ Спасибо":
-        await send_message(
-            context.bot, chat_id,
+    if text == "❤️ Спасибо":
+        await send_message(context.bot, chat_id,
             "Спасибо, брат, что оценил. ❤️\n\n"
             "Если хочешь поддержать (на Золофт, кофе или просто так):\n"
-            "💳 Сбер: 2202 2084 3481 5313\n\n"
+            "Сбер: 2202 2084 3481 5313\n\n"
             "Главное — держись.\n"
             "Мы справимся.",
-            reply_markup=get_main_keyboard()
+            save_for_deletion=False
         )
         return
 
-    elif text == "💪 Держитесь!":
+    if text == "💪 Держитесь!":
         if not can_broadcast_today(chat_id):
             await send_message(context.bot, chat_id, "Сегодня уже отправлял. Завтра снова сможешь.")
             return
+
         await send_message(context.bot, chat_id, "Спасибо, ты тоже держись!")
+        emoji = random.choice(["💪", "🫶", "🤝", "✊", "🔥"])
         for uid in get_all_active_users():
             if uid != chat_id:
                 try:
-                    await send_message(context.bot, uid, "💪")
+                    await send_message(context.bot, uid, emoji)
                     await asyncio.sleep(0.08)
-                except:
-                    pass
+                except Exception as e:
+                    logger.error(f"Не удалось отправить уведомление {uid}: {e}")
         mark_broadcast_sent(chat_id)
         return
 
-    elif text == "😔 Тяжело":
+    if text == "😔 Тяжело":
         techniques = [
-            "Сделай «дыхание спецназа»:\n\n"
-            "• Вдох носом 4 секунды\n"
-            "• Задержка 4 секунды\n"
-            "• Выдох ртом 4 секунды\n"
-            "• Задержка после выдоха 4 секунды\n\n"
-            "Повтори 6–8 раз. Тяга уйдёт.",
-
+            "Сделай «дыхание спецназа»:\n\n• Вдох носом 4 секунды\n• Задержка 4 секунды\n• Выдох ртом 4 секунды\n• Задержка после выдоха 4 секунды\n\nПовтори 6–8 раз. Тяга уйдёт.",
             "Сделай 20 приседаний или отжиманий прямо сейчас.",
             "Включи холодную воду и подставь руки/лицо на 30 секунд.",
             "Выйди на балкон или открой окно — 5 минут свежего воздуха.",
@@ -350,45 +379,38 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Сделай растяжку шеи и плеч — 10 кругов в каждую сторону."
         ]
         await send_message(context.bot, chat_id, random.choice(techniques))
-        await asyncio.sleep(2.0)
-        context.user_data['awaiting_relapse_confirm'] = True
-        await send_message(
-            context.bot,
-            chat_id,
-            "Сорвался?",
-            reply_markup=get_relapse_keyboard()
-        )
+
+        data[user_str]["awaiting_relapse"] = True
+        save_user_data(data)
+
+        await send_message(context.bot, chat_id, "Сорвался?", reply_markup=get_relapse_keyboard())
         return
 
-    elif text == "📊 Дни":
+    if text == "📊 Дни":
         days = get_days_count(chat_id)
-        msg = "Первый день. Начинаем." if days == 0 else "Прошёл 1 день" if days == 1 else f"Прошло {days} дней"
+        if days == 0:
+            msg = "Первый день. Начинаем."
+        elif days == 1:
+            msg = "Прошёл 1 день."
+        else:
+            msg = f"Прошло {days} дней."
         await send_message(context.bot, chat_id, msg)
         return
 
-    elif text == "⏸ Пауза":
+    if text == "⏸ Пауза":
         await stop(update, context)
         return
 
-    if context.user_data.get('awaiting_relapse_confirm'):
-        if text == "Да":
-            reset_counter(chat_id)
-            await send_message(context.bot, chat_id, "Ничего страшного. Начнём снова.", reply_markup=get_main_keyboard())
-        elif text == "Нет":
-            await send_message(context.bot, chat_id, random.choice([
-                "Красава, держись.", "Молодец.", "Уважаю.", "Ты справишься."
-            ]), reply_markup=get_main_keyboard())
-        context.user_data['awaiting_relapse_confirm'] = False
-        return
-
 # =====================================================
-# Запуск
+# Запуск б796ота
 # =====================================================
 def main():
     app = Application.builder().token(TOKEN).build()
+
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    logger.info("Бот запущен")
+
+    logger.info("Бот запущен и работает")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
