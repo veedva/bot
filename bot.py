@@ -21,9 +21,6 @@ LOCK_FILE = DATA_FILE + ".lock"
 MOSCOW_TZ = pytz.timezone('Europe/Moscow')
 NOW = lambda: datetime.now(MOSCOW_TZ)
 
-# =====================================================
-# Твои сообщения — без единого моего слова
-# =====================================================
 MORNING_MESSAGES = [
     "Привет. Давай сегодня не будем, хорошо?",
     "Доброе утро, брат. Не сегодня.",
@@ -86,9 +83,14 @@ NIGHT_MESSAGES = [
 ]
 
 MILESTONES = {
-    3: "Три дня уже. Неплохо идём.", 7: "Неделя прошла. Продолжаем.", 14: "Две недели! Хорошо идёт.",
-    30: "Месяц. Серьёзно уважаю.", 60: "Два месяца. Сильный результат.", 90: "Три месяца! Ты реально крутой.",
-    180: "Полгода. Это впечатляет.", 365: "Год. Легенда."
+    3: "Три дня уже. Неплохо идём.",
+    7: "Неделя прошла. Продолжаем.",
+    14: "Две недели! Хорошо идёт.",
+    30: "Месяц. Серьёзно уважаю.",
+    60: "Два месяца. Сильный результат.",
+    90: "Три месяца! Ты реально крутой.",
+    180: "Полгода. Это впечатляет.",
+    365: "Год. Легенда."
 }
 
 HELP_TECHNIQUES = [
@@ -106,15 +108,16 @@ HELP_TECHNIQUES = [
     "Открой камеру на телефоне, посмотри себе в глаза и скажи вслух: «Я сильнее этой хуйни». Даже если звучит тупо — работает."
 ]
 
-# =====================================================
-# Твоя клавиатура — как ты и хотел
-# =====================================================
+TU_TUT_FIRST = ["Тут.", "Ого, привет.", "А куда я денусь?", "Здесь.", "Тут, как всегда.", "Конечно тут.", "Тут. Держусь.", "Ага.", "Привет.", "Тут. Не переживай."]
+TU_TUT_SECOND = ["Держимся сегодня.", "Сегодня мимо.", "Всё по плану.", "Не сегодня.", "Ты справишься.", "Я рядом.", "Держись.", "Все будет нормально.", "Я в деле.", "Всё под контролем."]
+
+HOLD_RESPONSES = ["Принял. ✊", "Молодец. ✊", "Красава. ✊", "Сила. ✊", "Так держать. ✊"]
+
 def get_main_keyboard():
     return ReplyKeyboardMarkup([
-        [KeyboardButton("✊ Держусь")],
-        [KeyboardButton("😔 Тяжело"), KeyboardButton("📊 Дни")],
-        [KeyboardButton("👋 Ты тут?"), KeyboardButton("⏸ Пауза")],
-        [KeyboardButton("❤️ Спасибо")]
+        [KeyboardButton("✊ Держусь"), KeyboardButton("😔 Тяжело")],
+        [KeyboardButton("📊 Дни"), KeyboardButton("👋 Ты тут?")],
+        [KeyboardButton("❤️ Спасибо"), KeyboardButton("⏸ Пауза")]
     ], resize_keyboard=True)
 
 def get_start_keyboard():
@@ -122,123 +125,141 @@ def get_start_keyboard():
 
 def get_heavy_keyboard():
     return ReplyKeyboardMarkup([
-        [KeyboardButton("Помочь себе")],
-        [KeyboardButton("Срыв"), KeyboardButton("Чуть не сорвался")],
-        [KeyboardButton("Назад")]
+        [KeyboardButton("💪 Помочь себе")],
+        [KeyboardButton("😞 Срыв"), KeyboardButton("😅 Чуть не сорвался")],
+        [KeyboardButton("↩️ Назад")]
     ], resize_keyboard=True)
 
-def get_one_more_help_keyboard():
-    return ReplyKeyboardMarkup([[KeyboardButton("Ещё способ"), KeyboardButton("Назад")]], resize_keyboard=True)
+def get_help_keyboard():
+    return ReplyKeyboardMarkup([
+        [KeyboardButton("🔄 Ещё способ")],
+        [KeyboardButton("↩️ Назад")]
+    ], resize_keyboard=True)
 
-# =====================================================
-# Данные
-# =====================================================
-def load_user_data():
+def load_data():
     with FileLock(LOCK_FILE):
         if os.path.exists(DATA_FILE):
             try:
                 with open(DATA_FILE, "r", encoding="utf-8") as f:
                     return json.load(f)
-            except Exception as e:
-                logger.error(f"Ошибка чтения user_data: {e}")
+            except:
                 return {}
         return {}
 
-def save_user_data(data):
+def save_data(data):
     with FileLock(LOCK_FILE):
-        try:
-            with open(DATA_FILE, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            logger.error(f"Ошибка записи user_data: {e}")
+        with open(DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
 
-def get_days_count(user_id):
-    data = load_user_data()
-    user_str = str(user_id)
-    if user_str in data and "start_date" in data[user_str]:
-        start = datetime.fromisoformat(data[user_str]["start_date"])
+def get_user(user_id):
+    data = load_data()
+    uid = str(user_id)
+    if uid not in data:
+        data[uid] = {
+            "start_date": NOW().isoformat(),
+            "active": False,
+            "state": "normal",
+            "best_streak": 0,
+            "message_ids": [],
+            "hold_count": 0,
+            "hold_date": None,
+            "hold_time": None,
+            "pinned_message_id": None
+        }
+    return data, data[uid]
+
+def get_days(user_id):
+    _, user = get_user(user_id)
+    if user.get("start_date"):
+        start = datetime.fromisoformat(user["start_date"])
         return (NOW() - start).days
     return 0
 
-def reset_counter(user_id):
-    data = load_user_data()
-    user_str = str(user_id)
-    current = get_days_count(user_id)
-    best = data[user_str].get("best_streak", 0)
-    if current > best:
-        data[user_str]["best_streak"] = current
-    data[user_str]["start_date"] = NOW().isoformat()
-    save_user_data(data)
+def reset_streak(user_id):
+    data, user = get_user(user_id)
+    current = get_days(user_id)
+    if current > user.get("best_streak", 0):
+        user["best_streak"] = current
+    user["start_date"] = NOW().isoformat()
+    user["hold_count"] = 0
+    user["hold_date"] = None
+    user["hold_time"] = None
+    save_data(data)
 
-def get_all_active_users():
-    return [int(uid) for uid, info in load_user_data().items() if info.get("active")]
+def get_active_users():
+    return [int(uid) for uid, u in load_data().items() if u.get("active")]
 
-# =====================================================
-# Закреплённое
-# =====================================================
-async def update_pinned_progress(bot, chat_id):
-    days = get_days_count(chat_id)
-    best = load_user_data().get(str(chat_id), {}).get("best_streak", 0)
-    text = f"День {days} • Лучший стрик: {best}"
-    data = load_user_data()
-    user_str = str(chat_id)
-    pinned_id = data[user_str].get("pinned_message_id")
+async def update_pin(bot, chat_id):
+    days = get_days(chat_id)
+    _, user = get_user(chat_id)
+    best = user.get("best_streak", 0)
+    
+    if days == 0:
+        text = f"Первый день • Лучший стрик: {best}"
+    elif days == 1:
+        text = f"День {days} • Лучший: {best}"
+    else:
+        text = f"День {days} • Лучший: {best}"
+    
+    pin_id = user.get("pinned_message_id")
     try:
-        if pinned_id:
-            await bot.edit_message_text(chat_id=chat_id, message_id=pinned_id, text=text)
+        if pin_id:
+            await bot.edit_message_text(chat_id=chat_id, message_id=pin_id, text=text)
         else:
-            msg = await bot.send_message(chat_id=chat_id, text=text)
-            await bot.pin_chat_message(chat_id=chat_id, message_id=msg.message_id, disable_notification=True)
-            data[user_str]["pinned_message_id"] = msg.message_id
-            save_user_data(data)
+            msg = await bot.send_message(chat_id, text)
+            await bot.pin_chat_message(chat_id, msg.message_id, disable_notification=True)
+            data = load_data()
+            data[str(chat_id)]["pinned_message_id"] = msg.message_id
+            save_data(data)
     except Exception as e:
-        logger.warning(f"Ошибка закреплённого у {chat_id}: {e}")
+        logger.warning(f"Ошибка pin для {chat_id}: {e}")
 
-# =====================================================
-# Отправка
-# =====================================================
-async def send_message(bot, chat_id, text, reply_markup=None, save_for_deletion=True):
-    markup = reply_markup or get_main_keyboard()
-    msg = await bot.send_message(chat_id=chat_id, text=text, reply_markup=markup)
-    if save_for_deletion:
-        data = load_user_data()
-        str_id = str(chat_id)
-        data.setdefault(str_id, {}).setdefault("message_ids", []).append(msg.message_id)
-        save_user_data(data)
+async def send(bot, chat_id, text, keyboard=None, save=True):
+    kb = keyboard or get_main_keyboard()
+    msg = await bot.send_message(chat_id, text, reply_markup=kb)
+    
+    if save:
+        data = load_data()
+        data[str(chat_id)].setdefault("message_ids", []).append(msg.message_id)
+        if len(data[str(chat_id)]["message_ids"]) > 500:
+            data[str(chat_id)]["message_ids"] = data[str(chat_id)]["message_ids"][-500:]
+        save_data(data)
+    
     return msg
 
-# =====================================================
-# Рассылки
-# =====================================================
-async def send_morning_message(context: ContextTypes.DEFAULT_TYPE):
+async def morning_job(context):
     chat_id = context.job.chat_id
-    if not load_user_data().get(str(chat_id), {}).get("active"):
+    _, user = get_user(chat_id)
+    if not user.get("active"):
         return
-    days = get_days_count(chat_id)
+    
+    days = get_days(chat_id)
     text = MILESTONES.get(days, random.choice(MORNING_MESSAGES))
-    await send_message(context.bot, chat_id, text)
-    await update_pinned_progress(context.bot, chat_id)
+    await send(context.bot, chat_id, text)
+    await update_pin(context.bot, chat_id)
 
-async def send_evening_message(context: ContextTypes.DEFAULT_TYPE):
+async def evening_job(context):
     chat_id = context.job.chat_id
-    if not load_user_data().get(str(chat_id), {}).get("active"):
+    _, user = get_user(chat_id)
+    if not user.get("active"):
         return
-    await send_message(context.bot, chat_id, random.choice(EVENING_MESSAGES))
+    await send(context.bot, chat_id, random.choice(EVENING_MESSAGES))
 
-async def send_night_message(context: ContextTypes.DEFAULT_TYPE):
+async def night_job(context):
     chat_id = context.job.chat_id
-    if not load_user_data().get(str(chat_id), {}).get("active"):
+    _, user = get_user(chat_id)
+    if not user.get("active"):
         return
-    await send_message(context.bot, chat_id, random.choice(NIGHT_MESSAGES))
-    await update_pinned_progress(context.bot, chat_id)
+    await send(context.bot, chat_id, random.choice(NIGHT_MESSAGES))
+    await update_pin(context.bot, chat_id)
 
-async def midnight_clean_chat(context: ContextTypes.DEFAULT_TYPE):
+async def midnight_clean(context):
     chat_id = context.job.chat_id
-    data = load_user_data()
-    user_str = str(chat_id)
-    ids = data.get(user_str, {}).get("message_ids", [])
-    data[user_str]["message_ids"] = []
-    save_user_data(data)
+    data, user = get_user(chat_id)
+    ids = user.get("message_ids", [])
+    user["message_ids"] = []
+    save_data(data)
+    
     for msg_id in ids:
         try:
             await context.bot.delete_message(chat_id, msg_id)
@@ -246,181 +267,173 @@ async def midnight_clean_chat(context: ContextTypes.DEFAULT_TYPE):
         except:
             pass
 
-# =====================================================
-# Старт
-# =====================================================
+def schedule_jobs(chat_id, job_queue):
+    for name in [f"morning_{chat_id}", f"evening_{chat_id}", f"night_{chat_id}", f"midnight_{chat_id}"]:
+        for job in job_queue.get_jobs_by_name(name):
+            job.schedule_removal()
+    
+    job_queue.run_daily(morning_job, time(9, 0, tzinfo=MOSCOW_TZ), chat_id=chat_id, name=f"morning_{chat_id}")
+    job_queue.run_daily(evening_job, time(18, 0, tzinfo=MOSCOW_TZ), chat_id=chat_id, name=f"evening_{chat_id}")
+    job_queue.run_daily(night_job, time(23, 0, tzinfo=MOSCOW_TZ), chat_id=chat_id, name=f"night_{chat_id}")
+    job_queue.run_daily(midnight_clean, time(0, 1, tzinfo=MOSCOW_TZ), chat_id=chat_id, name=f"midnight_{chat_id}")
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
-    data = load_user_data()
-    user_str = str(chat_id)
-    data.setdefault(user_str, {})
-    data[user_str].update({
-        "start_date": NOW().isoformat(),
-        "active": True,
-        "state": "normal",
-        "best_streak": data[user_str].get("best_streak", 0)
-    })
-    save_user_data(data)
-
-    await send_message(context.bot, chat_id,
+    data, user = get_user(chat_id)
+    user["active"] = True
+    user["state"] = "normal"
+    save_data(data)
+    
+    await send(context.bot, chat_id,
         "Привет, брат.\n\n"
         "Я буду писать три раза в день — просто напомню: сегодня не надо.\n\n"
         "Когда тяжело — жми «✊ Держусь».\n"
-        "Все, кто тоже в деле, получат пуш. Без слов. Просто узнают, что ты ещё здесь.\n"
+        "Все, кто тоже в деле, получат пуш. Просто узнают, что ты ещё здесь.\n"
         "Можешь жать до 5 раз в день, если совсем пиздец.\n\n"
         "Держись.",
-        save_for_deletion=False
+        save=False
     )
-    await update_pinned_progress(context.bot, chat_id)
-
-    for name in [f"morning_{chat_id}", f"evening_{chat_id}", f"night_{chat_id}", f"midnight_{chat_id}"]:
-        for job in context.job_queue.get_jobs_by_name(name):
-            job.schedule_removal()
-
-    context.job_queue.run_daily(send_morning_message, time(9, 0, tzinfo=MOSCOW_TZ), chat_id=chat_id, name=f"morning_{chat_id}")
-    context.job_queue.run_daily(send_evening_message, time(18, 0, tzinfo=MOSCOW_TZ), chat_id=chat_id, name=f"evening_{chat_id}")
-    context.job_queue.run_daily(send_night_message, time(23, 0, tzinfo=MOSCOW_TZ), chat_id=chat_id, name=f"night_{chat_id}")
-    context.job_queue.run_daily(midnight_clean_chat, time(0, 1, tzinfo=MOSCOW_TZ), chat_id=chat_id, name=f"midnight_{chat_id}")
+    
+    await update_pin(context.bot, chat_id)
+    schedule_jobs(chat_id, context.job_queue)
 
 async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
-    data = load_user_data()
-    user_str = str(chat_id)
-    if user_str in data:
-        data[user_str]["active"] = False
-        data[user_str]["state"] = "normal"
-        save_user_data(data)
-
+    data, user = get_user(chat_id)
+    user["active"] = False
+    user["state"] = "normal"
+    save_data(data)
+    
     for name in [f"morning_{chat_id}", f"evening_{chat_id}", f"night_{chat_id}", f"midnight_{chat_id}"]:
         for job in context.job_queue.get_jobs_by_name(name):
             job.schedule_removal()
+    
+    await send(context.bot, chat_id, "Остановлено. Жми ▶ Начать, когда будешь готов.", get_start_keyboard(), False)
 
-    await send_message(context.bot, chat_id, "Остановлено. Жми ▶ Начать, когда будешь готов.", get_start_keyboard(), False)
-
-# =====================================================
-# Держусь — твои правила
-# =====================================================
-async def handle_hold_button(chat_id, context):
-    data = load_user_data()
-    user_str = str(chat_id)
-    data.setdefault(user_str, {})
-
+async def handle_hold(chat_id, context):
+    data, user = get_user(chat_id)
     today = NOW().date()
-    last_date = data[user_str].get("hold_date")
-    last_time = data[user_str].get("hold_time")
-    count = data[user_str].get("hold_count", 0)
-
+    
+    last_date = user.get("hold_date")
+    last_time = user.get("hold_time")
+    count = user.get("hold_count", 0)
+    
     if str(last_date) != str(today):
         count = 0
-
+    
     if last_time:
         last_dt = datetime.fromisoformat(last_time)
-        if (NOW() - last_dt).total_seconds() < 1800:
-            await send_message(context.bot, chat_id, "Погоди ещё немного, брат. Только что было.")
+        seconds_passed = (NOW() - last_dt).total_seconds()
+        if seconds_passed < 1800:
+            minutes_left = int((1800 - seconds_passed) / 60)
+            await send(context.bot, chat_id, f"Погоди ещё {minutes_left} минут, брат.")
             return
-
+    
     if count >= 5:
-        await send_message(context.bot, chat_id, "Сегодня уже 5 раз. Ты реально держишься, брат. Горжусь тобой. ✊\nЗавтра снова сможешь.")
+        await send(context.bot, chat_id, "Сегодня уже 5 раз. Ты реально держишься, брат. Горжусь тобой. ✊\nЗавтра снова сможешь.")
         return
-
-    await send_message(context.bot, chat_id, random.choice([
-        "Принял. ✊", "Молодец. ✊", "Красава. ✊", "Сила. ✊", "Так держать. ✊"
-    ]), save_for_deletion=False)
-
-    for uid in get_all_active_users():
+    
+    await send(context.bot, chat_id, random.choice(HOLD_RESPONSES), save=False)
+    
+    for uid in get_active_users():
         if uid != chat_id:
             try:
                 await context.bot.send_message(uid, "✊")
                 await asyncio.sleep(0.08)
             except:
                 pass
+    
+    user["hold_time"] = NOW().isoformat()
+    user["hold_date"] = str(today)
+    user["hold_count"] = count + 1
+    save_data(data)
 
-    data[user_str]["hold_time"] = NOW().isoformat()
-    data[user_str]["hold_date"] = str(today)
-    data[user_str]["hold_count"] = count + 1
-    save_user_data(data)
-
-# =====================================================
-# Обработка — твои ответы на "Ты тут?"
-# =====================================================
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     chat_id = update.effective_chat.id
-    user_str = str(chat_id)
-    data = load_user_data()
-    state = data.get(user_str, {}).get("state", "normal")
-
+    data, user = get_user(chat_id)
+    state = user.get("state", "normal")
+    
     if state == "heavy_menu":
-        if text == "Помочь себе":
-            await send_message(context.bot, chat_id, random.choice(HELP_TECHNIQUES), get_one_more_help_keyboard(), False)
-            data[user_str]["state"] = "help_mode"
-            save_user_data(data)
-            return
-        if text == "Срыв":
-            reset_counter(chat_id)
-            await send_message(context.bot, chat_id, "Ничего страшного.\nНачнём заново. Ты молодец, что сказал честно.", get_main_keyboard(), False)
-            await update_pinned_progress(context.bot, chat_id)
-            data[user_str]["state"] = "normal"
-            save_user_data(data)
-            return
-        if text == "Чуть не сорвался":
-            await send_message(context.bot, chat_id, "Красавчик. Это и есть победа. ✊", get_main_keyboard(), False)
-            data[user_str]["state"] = "normal"
-            save_user_data(data)
-            return
-        if text == "Назад":
-            await send_message(context.bot, chat_id, "Держись.", get_main_keyboard(), False)
-            data[user_str]["state"] = "normal"
-            save_user_data(data)
-            return
-
+        if text == "💪 Помочь себе":
+            await send(context.bot, chat_id, random.choice(HELP_TECHNIQUES), get_help_keyboard(), False)
+            user["state"] = "help_mode"
+            save_data(data)
+        elif text == "😞 Срыв":
+            reset_streak(chat_id)
+            await send(context.bot, chat_id, "Ничего страшного.\nНачнём заново. Ты молодец, что сказал честно.", get_main_keyboard(), False)
+            await update_pin(context.bot, chat_id)
+            user["state"] = "normal"
+            save_data(data)
+        elif text == "😅 Чуть не сорвался":
+            await send(context.bot, chat_id, "Красавчик. Это и есть победа. ✊", get_main_keyboard(), False)
+            user["state"] = "normal"
+            save_data(data)
+        elif text == "↩️ Назад":
+            await send(context.bot, chat_id, "Держись.", get_main_keyboard(), False)
+            user["state"] = "normal"
+            save_data(data)
+        return
+    
     if state == "help_mode":
-        if text == "Ещё способ":
-            await send_message(context.bot, chat_id, random.choice(HELP_TECHNIQUES), get_one_more_help_keyboard(), False)
-            return
-        if text == "Назад":
-            await send_message(context.bot, chat_id, "Держись там.", get_main_keyboard(), False)
-            data[user_str]["state"] = "normal"
-            save_user_data(data)
-            return
-
+        if text == "🔄 Ещё способ":
+            await send(context.bot, chat_id, random.choice(HELP_TECHNIQUES), get_help_keyboard(), False)
+        elif text == "↩️ Назад":
+            await send(context.bot, chat_id, "Держись там.", get_main_keyboard(), False)
+            user["state"] = "normal"
+            save_data(data)
+        return
+    
     if text == "▶ Начать":
         await start(update, context)
+    
     elif text == "👋 Ты тут?":
         await asyncio.sleep(random.uniform(2.8, 5.5))
-        await send_message(context.bot, chat_id, random.choice([
-            "Тут.", "Ого, привет.", "А куда я денусь?", "Здесь.", "Тут, как всегда.",
-            "Конечно тут.", "Тут. Держусь.", "Ага.", "Привет.", "Тут. Не переживай."
-        ]))
+        await send(context.bot, chat_id, random.choice(TU_TUT_FIRST))
         await asyncio.sleep(random.uniform(2.0, 4.5))
-        await send_message(context.bot, chat_id, random.choice([
-            "Держимся сегодня.", "Сегодня мимо.", "Всё по плану.", "Не сегодня.",
-            "Ты справишься.", "Я рядом.", "Держись.", "Все будет нормально.", "Я в деле.", "Всё под контролем."
-        ]))
+        await send(context.bot, chat_id, random.choice(TU_TUT_SECOND))
+    
     elif text == "✊ Держусь":
-        await handle_hold_button(chat_id, context)
+        await handle_hold(chat_id, context)
+    
     elif text == "😔 Тяжело":
-        data[user_str]["state"] = "heavy_menu"
-        save_user_data(data)
-        await send_message(context.bot, chat_id, "Что будем делать?", get_heavy_keyboard(), False)
+        user["state"] = "heavy_menu"
+        save_data(data)
+        await send(context.bot, chat_id, "Что будем делать?", get_heavy_keyboard(), False)
+    
     elif text == "📊 Дни":
-        days = get_days_count(chat_id)
-        msg = "Первый день." if days == 0 else "Прошёл 1 день." if days == 1 else f"Прошло {days} дней."
-        await send_message(context.bot, chat_id, msg)
+        days = get_days(chat_id)
+        best = user.get("best_streak", 0)
+        
+        if days == 0:
+            msg = "Первый день."
+        elif days == 1:
+            msg = "Прошёл 1 день."
+        else:
+            msg = f"Прошло {days} дней."
+        
+        if best > 0 and best != days:
+            msg += f"\n\nТвой лучший стрик: {best} дней."
+        
+        await send(context.bot, chat_id, msg)
+    
     elif text == "❤️ Спасибо":
-        await send_message(context.bot, chat_id,
+        await send(context.bot, chat_id,
             "Спасибо, брат. ❤️\n\nЕсли хочешь поддержать:\nСбер 2202 2084 3481 5313\n\nГлавное — держись.",
-            save_for_deletion=False)
+            save=False
+        )
+    
     elif text == "⏸ Пауза":
         await stop(update, context)
 
-# =====================================================
-# Запуск
-# =====================================================
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
+    logger.error(f"Ошибка: {context.error}", exc_info=context.error)
+
 def main():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_error_handler(error_handler)
     logger.info("Кент на посту ✊")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
