@@ -5,11 +5,18 @@ import os
 import asyncio
 from datetime import datetime, time
 from filelock import FileLock
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    CallbackQueryHandler,
+    ContextTypes,
+)
 import pytz
 
-logging.basicConfig(format='%(asctime)s — %(levelname)s — %(message)s', level=logging.INFO)
+logging.basicConfig(
+    format='%(asctime)s — %(levelname)s — %(message)s', level=logging.INFO
+)
 logger = logging.getLogger(__name__)
 
 TOKEN = os.getenv("BOT_TOKEN")
@@ -21,20 +28,97 @@ LOCK_FILE = DATA_FILE + ".lock"
 MOSCOW_TZ = pytz.timezone('Europe/Moscow')
 NOW = lambda: datetime.now(MOSCOW_TZ)
 
-# ---- Тексты ----
-MORNING_MESSAGES = ["Привет. Давай сегодня не будем, хорошо?", "Доброе утро, брат. Не сегодня.", "Привет. Держимся сегодня, да?"]
-EVENING_MESSAGES = ["Брат, не сегодня. Держись.", "Эй, я тут. Давай не сегодня.", "Привет. Сегодня держимся, помнишь?"]
-NIGHT_MESSAGES = ["Ты молодец. До завтра.", "Красавчик. Спокойной.", "Держался сегодня. Уважаю."]
-HELP_TECHNIQUES = [
-    "Бери и дыши так по кругу: вдох носом 4 сек → задержка 4 сек → выдох 4 сек → пауза 4 сек. Повтори 6–8 раз.",
-    "Падай и делай 20–30 отжиманий или приседаний до жжения.",
-    "Ледяная вода на лицо и шею 20–30 сек — мозг забывает про тягу.",
-    "Выйди на балкон на 3–5 минут. Даже если -20°C — всё равно выйди."
+MORNING_MESSAGES = [
+    "Привет. Давай сегодня не будем, хорошо?",
+    "Доброе утро, брат. Не сегодня.",
+    "Привет. Держимся сегодня, да?",
+    "Доброе. Сегодня дел много, нет наверное.",
+    "Привет. Сегодня обойдёмся и так пиздец.",
+    "Утро. Давай только не сегодня.",
+    "Привет, брат. Сегодня пожалуй что ну его нахуй, знаешь.",
+    "Доброе утро. НУ не прям сегодня же.",
+    "Привет. Сегодня точно не надо.",
+    "Доброе! Давай сегодня без этого.",
+    "Утро. Денег жалко, да и ну его.",
+    "Привет. Сегодня легко обойдёмся и без этого.",
+    "Братан, доброе. Сегодня точно нет.",
+    "Эй. Сегодня не в тему.",
+    "Доброе утро. Только не сегодня.",
+    "Привет. Может завтра, но сегодня нет.",
+    "Утро. Сегодня спокойно обходимся.",
+    "Че как? Сегодня не стоит пожалуй."
 ]
-TU_TUT_FIRST = ["Тут.", "Привет.", "А куда я денусь?", "Здесь.", "Тут, как всегда."]
-TU_TUT_SECOND = ["Держимся.", "Я с тобой.", "Всё по плану?", "Не хочу сегодня.", "Сегодня не буду."]
 
-# ---- Работа с данными ----
+EVENING_MESSAGES = [
+    "Брат, не сегодня. Держись.",
+    "Эй, я тут. Давай не сегодня.",
+    "Привет. Сегодня держимся, помнишь?",
+    "Брат, держись. Сегодня нет.",
+    "Эй. Ещё чуть-чуть. Не сегодня.",
+    "Я с тобой. Сегодня точно нет.",
+    "Привет. Давай обойдёмся.",
+    "Брат, мы же решили — не сегодня.",
+    "Держись там. Сегодня мимо.",
+    "Привет. Сегодня пропустим.",
+    "Эй. Сегодня точно можно без этого.",
+    "Братан, сегодня не надо.",
+    "Привет. Может завтра, сегодня мимо.",
+    "Как дела? Сегодня обойдёмся.",
+    "Эй, брат. Сегодня не будем.",
+    "Привет. Сегодня точно ни к чему.",
+    "Братан, ну может завтра, а сегодня нет?"
+]
+
+NIGHT_MESSAGES = [
+    "Ты молодец. До завтра.",
+    "Красавчик. Спокойной.",
+    "Держался сегодня. Уважаю.",
+    "Сегодня справились. До завтра.",
+    "Молодец, держишься.",
+    "Ещё один день позади.",
+    "Ты сильный. До завтра.",
+    "Сегодня получилось. Отдыхай.",
+    "Справился. Уважение.",
+    "Держался весь день. Красава.",
+    "Нормально прошёл день.",
+    "Сегодня справились. Отдыхай.",
+    "Ещё один день прошёл. До завтра.",
+    "Держались сегодня. Молодцы.",
+    "День зачётный. Спокойной.",
+    "Справились. До завтра.",
+    "Сегодня получилось. Отдыхай."
+]
+
+MILESTONES = {
+    3: "Три дня уже. Неплохо идём.",
+    7: "Неделя прошла. Продолжаем.",
+    14: "Две недели! Хорошо идёт.",
+    30: "Месяц. Серьёзно, уважаю.",
+    60: "Два месяца. Сильный результат.",
+    90: "Три месяца! Ты реально крутой.",
+    180: "Полгода. Это впечатляет.",
+    365: "Год. Легенда."
+}
+
+HELP_TECHNIQUES = [
+    "Бери и дыши так по кругу: вдох носом 4 секунды → задержи дыхание считая до 4 → выдох ртом 4 секунды → не дыши 4 секунды. Повтори 6–8 раз подряд. Через минуту мозг переключается и тяга уходит, проверено тысячу раз.",
+    "Прямо сейчас падай и делай 20–30 отжиманий или приседаний до жжения в мышцах. Пока мышцы горят — башка не думает о херне.",
+    "Открой кран с ледяной водой и суй туда лицо + шею на 20–30 секунд. Мозг получает шок и на несколько минут забывает про всё остальное.",
+    "Выйди на балкон или просто открой окно настежь. Стоять и дышать свежим воздухом 3–5 минут. Даже если -20, всё равно выйди.",
+    "Налей самый холодный стакан воды из-под крана и пей медленно-медленно, маленькими глотками. Пока пьёшь — тяга слабеет.",
+    "Возьми телефон, открой заметки и напиши три вещи, за которые ты сегодня реально благодарен. Хоть «не просрал день», хоть «есть крыша над головой». Мозг переключается на позитив.",
+    "Съешь что-то максимально кислое или острое: дольку лимона, ложку горчицы, кусок имбиря, чили-перец. Жжёт рот — башка забывает про тягу.",
+    "Включи любой трек и просто ходи быстрым шагом по квартире 3–4 минуты. Главное — не останавливаться.",
+    "Сядь на стул или на пол, выпрями спину, руки на колени, закрой глаза и просто сиди минуту молча. Ничего не делай, просто дыши. Это как перезагрузка.",
+    "Делай круговые движения плечами назад-вперёд по 15 раз в каждую сторону, потом наклоны головы. Мышцы расслабляются, тревога уходит.",
+    "Поставь таймер на 10 минут и говори себе: «Я просто подожду 10 минут, потом решу». В 95 % случаев через 10 минут уже не хочется.",
+    "Открой камеру на телефоне, посмотри себе в глаза и скажи вслух: «Я сильнее этой хуйни». Даже если звучит тупо — работает."
+]
+
+TU_TUT_FIRST = ["Тут.", "Привет.", "А куда я денусь?", "Здесь.", "Тут, как всегда.", "Да, да, привет.", "Че как?", "Ага.", "Здраствуй.", "Тут. Не переживай."]
+TU_TUT_SECOND = ["Держимся.", "Я с тобой.", "Всё по плану?", "Не хочу сегодня.", "Сегодня не буду.", "Я рядом.", "Держись.", "Все будет нормально.", "Я в деле.", "Всё под контролем."]
+HOLD_RESPONSES = ["Отправлено. ✊", "Молодец. ✊", "Красава. ✊", "Респект. ✊", "Так держать. ✊"]
+
 def load_data():
     with FileLock(LOCK_FILE):
         if os.path.exists(DATA_FILE):
@@ -59,11 +143,12 @@ def get_user(user_id):
             "active": False,
             "state": "normal",
             "best_streak": 0,
-            "message_id": None,
-            "menu_id": None,
+            "message_ids": [],
             "hold_count": 0,
             "hold_date": None,
             "hold_time": None,
+            "pinned_message_id": None,
+            "menu_message_id": None,
             "used_tips": []
         }
         save_data(data)
@@ -96,127 +181,99 @@ def get_next_tip(user_data: dict) -> str:
     used.append(choice)
     return HELP_TECHNIQUES[choice]
 
-# ---- Кнопки ----
-def main_menu():
-    keyboard = [
-        [InlineKeyboardButton("✊ Держусь", callback_data="hold"), InlineKeyboardButton("😔 Тяжело", callback_data="heavy")],
-        [InlineKeyboardButton("📊 Дни", callback_data="days"), InlineKeyboardButton("👋 Ты тут?", callback_data="tutut")],
-        [InlineKeyboardButton("❤️ Спасибо", callback_data="thanks"), InlineKeyboardButton("⏸ Пауза", callback_data="pause")]
-    ]
-    return InlineKeyboardMarkup(keyboard)
+async def update_pin(bot, chat_id):
+    """Обновление pinned-сообщения с текущим днём/пушем"""
+    days = get_days(chat_id)
+    _, user = get_user(chat_id)
+    best = user.get("best_streak", 0)
+    text = f"Первый день • Лучший стрик: {best}" if days == 0 else f"День {days} • Лучший стрик: {best}"
+    pin_id = user.get("pinned_message_id")
+    try:
+        if pin_id:
+            await bot.edit_message_text(chat_id=chat_id, message_id=pin_id, text=text)
+        else:
+            msg = await bot.send_message(chat_id, text)
+            await bot.pin_chat_message(chat_id, msg.message_id, disable_notification=True)
+            data, _ = get_user(chat_id)
+            data[str(chat_id)]["pinned_message_id"] = msg.message_id
+            save_data(data)
+    except Exception as e:
+        logger.warning(f"Ошибка pin для {chat_id}: {e}")
 
-def heavy_menu():
-    keyboard = [
-        [InlineKeyboardButton("💪 Помочь себе", callback_data="help"), InlineKeyboardButton("😅 Чуть не сорвался", callback_data="almost")],
-        [InlineKeyboardButton("😞 Срыв", callback_data="fail"), InlineKeyboardButton("↩️ Назад", callback_data="back")]
-    ]
-    return InlineKeyboardMarkup(keyboard)
+def build_menu_keyboard():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("✊ Держусь", callback_data="hold")],
+        [InlineKeyboardButton("😔 Тяжело", callback_data="heavy")],
+        [InlineKeyboardButton("📊 Дни", callback_data="days")],
+        [InlineKeyboardButton("👋 Ты тут?", callback_data="tutut")],
+        [InlineKeyboardButton("❤️ Спасибо", callback_data="thanks")],
+        [InlineKeyboardButton("⏸ Пауза", callback_data="pause")],
+        [InlineKeyboardButton("🔄 Ещё способ", callback_data="next_tip")],
+        [InlineKeyboardButton("↩️ Назад", callback_data="back")],
+    ])
 
-def help_menu():
-    keyboard = [
-        [InlineKeyboardButton("🔄 Ещё способ", callback_data="tip")],
-        [InlineKeyboardButton("↩️ Назад", callback_data="back")]
-    ]
-    return InlineKeyboardMarkup(keyboard)
-
-# ---- Основные функции ----
-async def send_or_edit(bot, chat_id, text, keyboard=None, message_id=None):
-    if message_id:
-        try:
-            await bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=text, reply_markup=keyboard)
-            return message_id
-        except:
-            msg = await bot.send_message(chat_id, text, reply_markup=keyboard)
-            return msg.message_id
-    else:
-        msg = await bot.send_message(chat_id, text, reply_markup=keyboard)
-        return msg.message_id
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
+async def send_menu(bot, chat_id):
+    """Отправка меню под приветственным сообщением"""
     data, user = get_user(chat_id)
-    user["active"] = True
-    user["state"] = "normal"
-    save_data(data)
-
-    text = ("Привет, брат.\n\nЯ буду писать три раза в день — просто напомнить: сегодня не надо.\n\n"
-            "Когда тяжело — жми «✊ Держусь».\nВсе получат пуш. Просто узнают, что ты ещё здесь.\n"
-            "Можешь жать до 5 раз в день, если совсем пиздец.\n\nДержись, я рядом.")
-
-    # Приветственное сообщение
-    if not user.get("message_id"):
-        user["message_id"] = await send_or_edit(context.bot, chat_id, text)
+    if user.get("menu_message_id"):
+        try:
+            await bot.edit_message_text(chat_id, message_id=user["menu_message_id"],
+                                        text="Че как?", reply_markup=build_menu_keyboard())
+        except:
+            msg = await bot.send_message(chat_id, "Че как?", reply_markup=build_menu_keyboard())
+            user["menu_message_id"] = msg.message_id
+            save_data(data)
     else:
-        await send_or_edit(context.bot, chat_id, text, message_id=user["message_id"])
+        msg = await bot.send_message(chat_id, "Че как?", reply_markup=build_menu_keyboard())
+        user["menu_message_id"] = msg.message_id
+        save_data(data)
 
-    # Меню «че как?»
-    if not user.get("menu_id"):
-        menu_msg = await context.bot.send_message(chat_id, "че как?", reply_markup=main_menu())
-        user["menu_id"] = menu_msg.message_id
-    else:
-        await send_or_edit(context.bot, chat_id, "че как?", main_menu(), message_id=user["menu_id"])
-
-    save_data(data)
-    schedule_jobs(chat_id, context.job_queue)
-
-# ---- Обработка кнопок ----
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    chat_id = query.message.chat_id
-    data, user = get_user(chat_id)
     await query.answer()
+    chat_id = query.message.chat.id
+    data, user = get_user(chat_id)
     state = user.get("state", "normal")
 
     if query.data == "hold":
         await handle_hold(chat_id, context)
     elif query.data == "heavy":
         user["state"] = "heavy_menu"
+        user["used_tips"] = []
         save_data(data)
-        await send_or_edit(context.bot, chat_id, "Что будем делать?", heavy_menu(), user["menu_id"])
-    elif query.data == "help" and state == "heavy_menu":
+        await send_menu(context.bot, chat_id)
+    elif query.data == "next_tip" and state == "help_mode":
         tip = get_next_tip(user)
-        user["state"] = "help_mode"
+        await context.bot.edit_message_text(chat_id=chat_id, message_id=user["menu_message_id"], text=tip, reply_markup=build_menu_keyboard())
         save_data(data)
-        await send_or_edit(context.bot, chat_id, tip, help_menu(), user["menu_id"])
-    elif query.data == "tip" and state == "help_mode":
-        tip = get_next_tip(user)
-        save_data(data)
-        await send_or_edit(context.bot, chat_id, tip, help_menu(), user["menu_id"])
     elif query.data == "back":
         user["state"] = "normal"
         user["used_tips"] = []
         save_data(data)
-        await send_or_edit(context.bot, chat_id, "че как?", main_menu(), user["menu_id"])
-    elif query.data == "almost" and state == "heavy_menu":
-        await send_or_edit(context.bot, chat_id, "Держись брат, скоро пройдет. ✊", main_menu(), user["menu_id"])
-        user["state"] = "normal"
-        save_data(data)
-    elif query.data == "fail" and state == "heavy_menu":
-        reset_streak(chat_id)
-        await send_or_edit(context.bot, chat_id, "Ничего страшного. Начнём заново. Ты молодец, что сказал честно.", main_menu(), user["menu_id"])
-        user["state"] = "normal"
-        save_data(data)
+        await send_menu(context.bot, chat_id)
     elif query.data == "days":
         days = get_days(chat_id)
         best = user.get("best_streak", 0)
-        msg = "Первый день." if days == 0 else f"Прошло {days} дней."
+        msg = "Первый день." if days == 0 else "Прошёл 1 день." if days == 1 else f"Прошло {days} дней."
         if best > 0 and best != days:
-            msg += f"\nТвой лучший стрик: {best} дней."
-        await send_or_edit(context.bot, chat_id, msg, main_menu(), user["menu_id"])
+            msg += f"\n\nТвой лучший стрик: {best} дней."
+        await context.bot.edit_message_text(chat_id=chat_id, message_id=user["menu_message_id"], text=msg, reply_markup=build_menu_keyboard())
     elif query.data == "tutut":
         await asyncio.sleep(random.uniform(2.8, 5.5))
-        await send_or_edit(context.bot, chat_id, random.choice(TU_TUT_FIRST), main_menu(), user["menu_id"])
+        await context.bot.edit_message_text(chat_id=chat_id, message_id=user["menu_message_id"],
+                                            text=random.choice(TU_TUT_FIRST), reply_markup=build_menu_keyboard())
         await asyncio.sleep(random.uniform(2.0, 4.5))
-        await send_or_edit(context.bot, chat_id, random.choice(TU_TUT_SECOND), main_menu(), user["menu_id"])
+        await context.bot.edit_message_text(chat_id=chat_id, message_id=user["menu_message_id"],
+                                            text=random.choice(TU_TUT_SECOND), reply_markup=build_menu_keyboard())
     elif query.data == "thanks":
-        text = "Спасибо, брат. ❤️\n\nЕсли хочешь поддержать:\nСбер 2202 2084 3481 5313\n\nГлавное — держись."
-        await send_or_edit(context.bot, chat_id, text, main_menu(), user["menu_id"])
+        await context.bot.edit_message_text(chat_id=chat_id, message_id=user["menu_message_id"],
+                                            text="Спасибо, брат. ❤️\n\nЕсли хочешь поддержать:\nСбер 2202 2084 3481 5313\n\nГлавное — держись.", reply_markup=build_menu_keyboard())
     elif query.data == "pause":
         user["active"] = False
         save_data(data)
-        await send_or_edit(context.bot, chat_id, "Уведомления приостановлены. Жми ▶ Начать, когда будешь готов.", None, user["menu_id"])
+        await context.bot.edit_message_text(chat_id=chat_id, message_id=user["menu_message_id"],
+                                            text="Уведомления приостановлены. Жми ▶ Начать, когда будешь готов.", reply_markup=None)
 
-# ---- Обработка «держусь» ----
 async def handle_hold(chat_id, context):
     data, user = get_user(chat_id)
     today = NOW().date()
@@ -228,29 +285,61 @@ async def handle_hold(chat_id, context):
     if last_time:
         if (NOW() - datetime.fromisoformat(last_time)).total_seconds() < 1800:
             minutes_left = int((1800 - (NOW() - datetime.fromisoformat(last_time)).total_seconds()) / 60)
-            await send_or_edit(context.bot, chat_id, f"Погоди ещё {minutes_left} минут, брат.", main_menu(), user["menu_id"])
+            await context.bot.send_message(chat_id, f"Погоди ещё {minutes_left} минут, брат.")
             return
     if count >= 5:
-        await send_or_edit(context.bot, chat_id, "Сегодня это уже 5 раз, брат, тормози. Завтра сможешь отправить еще. ✊", main_menu(), user["menu_id"])
+        await context.bot.send_message(chat_id, "Сегодня это уже 5 раз, брат, тормози. Завтра сможешь отправить еще. ✊")
         return
-    await send_or_edit(context.bot, chat_id, "Отправлено. ✊", main_menu(), user["menu_id"])
+    await context.bot.send_message(chat_id, random.choice(HOLD_RESPONSES))
     user["hold_time"] = NOW().isoformat()
     user["hold_date"] = str(today)
     user["hold_count"] = count + 1
     save_data(data)
 
-# ---- Пуши ----
-async def send_push(bot, chat_id, messages):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
     data, user = get_user(chat_id)
-    if not user.get("active"): return
-    text = random.choice(messages)
-    await send_or_edit(bot, chat_id, text, main_menu(), user["message_id"])
+    user["active"] = True
+    user["state"] = "normal"
+    save_data(data)
+    await context.bot.send_message(chat_id,
+        "Привет, брат.\n\n"
+        "Я буду писать три раза в день — просто напомнить: сегодня не надо.\n\n"
+        "Когда тяжело — жми «✊ Держусь».\n"
+        "Все получат пуш. Просто узнают, что ты ещё здесь.\n"
+        "Можешь жать до 5 раз в день, если совсем пиздец.\n\n"
+        "Держись, я рядом."
+    )
+    await update_pin(context.bot, chat_id)
+    await send_menu(context.bot, chat_id)
 
-async def morning_job(context): await send_push(context.bot, context.job.chat_id, MORNING_MESSAGES)
-async def evening_job(context): await send_push(context.bot, context.job.chat_id, EVENING_MESSAGES)
-async def night_job(context): await send_push(context.bot, context.job.chat_id, NIGHT_MESSAGES)
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
+    logger.error(f"Ошибка: {context.error}", exc_info=context.error)
 
-# ---- Расписание ----
+async def morning_job(context):
+    chat_id = context.job.chat_id
+    _, user = get_user(chat_id)
+    if not user.get("active"):
+        return
+    days = get_days(chat_id)
+    text = MILESTONES.get(days, random.choice(MORNING_MESSAGES))
+    _, _ = get_user(chat_id)
+    await context.bot.edit_message_text(chat_id=chat_id, message_id=user["pinned_message_id"], text=text)
+
+async def evening_job(context):
+    chat_id = context.job.chat_id
+    _, user = get_user(chat_id)
+    if not user.get("active"):
+        return
+    await context.bot.edit_message_text(chat_id=chat_id, message_id=user["pinned_message_id"], text=random.choice(EVENING_MESSAGES))
+
+async def night_job(context):
+    chat_id = context.job.chat_id
+    _, user = get_user(chat_id)
+    if not user.get("active"):
+        return
+    await context.bot.edit_message_text(chat_id=chat_id, message_id=user["pinned_message_id"], text=random.choice(NIGHT_MESSAGES))
+
 def schedule_jobs(chat_id, job_queue):
     for name in [f"morning_{chat_id}", f"evening_{chat_id}", f"night_{chat_id}"]:
         for job in job_queue.get_jobs_by_name(name):
@@ -259,11 +348,6 @@ def schedule_jobs(chat_id, job_queue):
     job_queue.run_daily(evening_job, time(18, 0, tzinfo=MOSCOW_TZ), chat_id=chat_id, name=f"evening_{chat_id}")
     job_queue.run_daily(night_job, time(23, 0, tzinfo=MOSCOW_TZ), chat_id=chat_id, name=f"night_{chat_id}")
 
-# ---- Ошибки ----
-async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
-    logger.error(f"Ошибка: {context.error}", exc_info=context.error)
-
-# ---- Главная ----
 def main():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
