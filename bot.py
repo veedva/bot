@@ -29,56 +29,56 @@ MORNING_MESSAGES = [
     "Привет. Сегодня обойдёмся и так пиздец.",
     "Утро. Давай только не сегодня.",
     "Привет, брат. Сегодня пожалуй что ну его нахуй знаешь.",
-    "Доброе утро. Не сегодня же.",
+    "Доброе утро. НУ не прям сегодня же.",
     "Привет. Сегодня точно не надо.",
     "Доброе! Давай сегодня без этого.",
-    "Утро. Денег жалко да и ну его.",
+    "Утро. Денег жалко, да и ну его.",
     "Привет. Сегодня легко обойдёмся и без этого.",
     "Братан, доброе. Сегодня точно нет.",
     "Эй. Сегодня не в тему.",
     "Доброе утро. Только не сегодня.",
     "Привет. Может завтра, но сегодня нет.",
     "Утро. Сегодня спокойно обходимся.",
-    "Эй. Сегодня не стоит."
+    "Че как? Сегодня не стоит пожалуй."
 ]
 
 EVENING_MESSAGES = [
-    "Брат, не сегодня. Держись.",
-    "Эй, я тут. Давай не сегодня.",
+    "Брат, не сегодня. Держись.", 
+    "Эй, я тут. Давай не сегодня.", 
     "Привет. Сегодня держимся, помнишь?",
-    "Брат, держись. Сегодня нет.",
-    "Эй. Ещё чуть-чуть. Не сегодня.",
+    "Брат, держись. Сегодня нет.", 
+    "Эй. Ещё чуть-чуть. Не сегодня.", 
     "Я с тобой. Сегодня точно нет.",
-    "Привет. Давай обойдёмся.",
-    "Брат, мы же решили — не сегодня.",
+    "Привет. Давай обойдёмся.", 
+    "Брат, мы же решили — не сегодня.", 
     "Держись там. Сегодня мимо.",
-    "Привет. Сегодня пропустим.",
-    "Эй. Сегодня точно можно без этого.",
+    "Привет. Сегодня пропустим.", 
+    "Эй. Сегодня точно можно без этого.", 
     "Братан, сегодня не надо.",
-    "Привет. Может завтра, сегодня мимо.",
-    "Как дела? Сегодня обойдёмся.",
+    "Привет. Может завтра, сегодня мимо.", 
+    "Как дела? Сегодня обойдёмся.", 
     "Эй, брат. Сегодня не будем.",
-    "Привет. Сегодня точно ни к чему.",
+    "Привет. Сегодня точно ни к чему.", 
     "Братан, ну может завтра, а сегодня нет?"
 ]
 
 NIGHT_MESSAGES = [
-    "Ты молодец. До завтра.",
-    "Красавчик. Спокойной.",
+    "Ты молодец. До завтра.", 
+    "Красавчик. Спокойной.", 
     "Держался сегодня. Уважаю.",
-    "Сегодня справились. До завтра.",
-    "Молодец, держишься.",
+    "Сегодня справились. До завтра.", 
+    "Молодец, держишься.", 
     "Ещё один день позади.",
-    "Ты сильный. До завтра.",
-    "Сегодня получилось. Отдыхай.",
+    "Ты сильный. До завтра.", 
+    "Сегодня получилось. Отдыхай.", 
     "Справился. Уважение.",
-    "Держался весь день. Красава.",
-    "Нормально прошёл день.",
+    "Держался весь день. Красава.", 
+    "Нормально прошёл день.", 
     "Сегодня справились. Отдыхай.",
-    "Ещё один день прошёл. До завтра.",
-    "Держались сегодня. Молодцы.",
+    "Ещё один день прошёл. До завтра.", 
+    "Держались сегодня. Молодцы.", 
     "День зачётный. Спокойной.",
-    "Справились. До завтра.",
+    "Справились. До завтра.", 
     "Сегодня получилось. Отдыхай."
 ]
 
@@ -86,7 +86,7 @@ MILESTONES = {
     3: "Три дня уже. Неплохо идём.",
     7: "Неделя прошла. Продолжаем.",
     14: "Две недели! Хорошо идёт.",
-    30: "Месяц. Серьёзно уважаю.",
+    30: "Месяц. Серьёзно, уважаю.",
     60: "Два месяца. Сильный результат.",
     90: "Три месяца! Ты реально крутой.",
     180: "Полгода. Это впечатляет.",
@@ -108,9 +108,8 @@ HELP_TECHNIQUES = [
     "Открой камеру на телефоне, посмотри себе в глаза и скажи вслух: «Я сильнее этой хуйни». Даже если звучит тупо — работает."
 ]
 
-TU_TUT_FIRST = ["Тут.", "Привет.", "А куда я денусь?", "Здесь.", "Тут, как всегда.", "Конечно тут.", "Тут. Держусь.", "Ага.", "Здарова.", "Тут. Не переживай."]
-TU_TUT_SECOND = ["Держимся.", "Я с тобой. Ты то со мной?", "Всё по плану.", "Не хочу сегодня.", "Сегодня не буду.", "Я рядом.", "Держись.", "Все будет нормально.", "Я в деле.", "Всё под контролем."]
-
+TU_TUT_FIRST = ["Тут.", "Привет.", "А куда я денусь?", "Здесь.", "Тут, как всегда.", "Да, да, привет.", "Че как?", "Ага.", "Здраствуй.", "Тут. Не переживай."]
+TU_TUT_SECOND = ["Держимся.", "Я с тобой.", "Всё по плану?", "Не хочу сегодня.", "Сегодня не буду.", "Я рядом.", "Держись.", "Все будет нормально.", "Я в деле.", "Всё под контролем."]
 HOLD_RESPONSES = ["Отправлено. ✊", "Молодец. ✊", "Красава. ✊", "Респект. ✊", "Так держать. ✊"]
 
 def get_main_keyboard():
@@ -164,8 +163,10 @@ def get_user(user_id):
             "hold_count": 0,
             "hold_date": None,
             "hold_time": None,
-            "pinned_message_id": None
+            "pinned_message_id": None,
+            "used_tips": []
         }
+        save_data(data)
     return data, data[uid]
 
 def get_days(user_id):
@@ -189,18 +190,20 @@ def reset_streak(user_id):
 def get_active_users():
     return [int(uid) for uid, u in load_data().items() if u.get("active")]
 
+def get_next_tip(user_data: dict) -> str:
+    used = user_data.setdefault("used_tips", [])
+    if len(used) >= len(HELP_TECHNIQUES):
+        used.clear()
+    available = [i for i in range(len(HELP_TECHNIQUES)) if i not in used]
+    choice = random.choice(available)
+    used.append(choice)
+    return HELP_TECHNIQUES[choice]
+
 async def update_pin(bot, chat_id):
     days = get_days(chat_id)
     _, user = get_user(chat_id)
     best = user.get("best_streak", 0)
-    
-    if days == 0:
-        text = f"Первый день • Лучший стрик: {best}"
-    elif days == 1:
-        text = f"День {days} • Лучший стрик: {best}"
-    else:
-        text = f"День {days} • Лучший стрик: {best}"
-    
+    text = f"Первый день • Лучший стрик: {best}" if days == 0 else f"День {days} • Лучший стрик: {best}"
     pin_id = user.get("pinned_message_id")
     try:
         if pin_id:
@@ -208,7 +211,7 @@ async def update_pin(bot, chat_id):
         else:
             msg = await bot.send_message(chat_id, text)
             await bot.pin_chat_message(chat_id, msg.message_id, disable_notification=True)
-            data = load_data()
+            data, _ = get_user(chat_id)
             data[str(chat_id)]["pinned_message_id"] = msg.message_id
             save_data(data)
     except Exception as e:
@@ -217,22 +220,18 @@ async def update_pin(bot, chat_id):
 async def send(bot, chat_id, text, keyboard=None, save=True):
     kb = keyboard or get_main_keyboard()
     msg = await bot.send_message(chat_id, text, reply_markup=kb)
-    
     if save:
-        data = load_data()
+        data, _ = get_user(chat_id)
         data[str(chat_id)].setdefault("message_ids", []).append(msg.message_id)
         if len(data[str(chat_id)]["message_ids"]) > 500:
             data[str(chat_id)]["message_ids"] = data[str(chat_id)]["message_ids"][-500:]
         save_data(data)
-    
     return msg
 
 async def morning_job(context):
     chat_id = context.job.chat_id
     _, user = get_user(chat_id)
-    if not user.get("active"):
-        return
-    
+    if not user.get("active"): return
     days = get_days(chat_id)
     text = MILESTONES.get(days, random.choice(MORNING_MESSAGES))
     await send(context.bot, chat_id, text)
@@ -241,15 +240,13 @@ async def morning_job(context):
 async def evening_job(context):
     chat_id = context.job.chat_id
     _, user = get_user(chat_id)
-    if not user.get("active"):
-        return
+    if not user.get("active"): return
     await send(context.bot, chat_id, random.choice(EVENING_MESSAGES))
 
 async def night_job(context):
     chat_id = context.job.chat_id
     _, user = get_user(chat_id)
-    if not user.get("active"):
-        return
+    if not user.get("active"): return
     await send(context.bot, chat_id, random.choice(NIGHT_MESSAGES))
     await update_pin(context.bot, chat_id)
 
@@ -259,7 +256,6 @@ async def midnight_clean(context):
     ids = user.get("message_ids", [])
     user["message_ids"] = []
     save_data(data)
-    
     for msg_id in ids:
         try:
             await context.bot.delete_message(chat_id, msg_id)
@@ -271,7 +267,6 @@ def schedule_jobs(chat_id, job_queue):
     for name in [f"morning_{chat_id}", f"evening_{chat_id}", f"night_{chat_id}", f"midnight_{chat_id}"]:
         for job in job_queue.get_jobs_by_name(name):
             job.schedule_removal()
-    
     job_queue.run_daily(morning_job, time(9, 0, tzinfo=MOSCOW_TZ), chat_id=chat_id, name=f"morning_{chat_id}")
     job_queue.run_daily(evening_job, time(18, 0, tzinfo=MOSCOW_TZ), chat_id=chat_id, name=f"evening_{chat_id}")
     job_queue.run_daily(night_job, time(23, 0, tzinfo=MOSCOW_TZ), chat_id=chat_id, name=f"night_{chat_id}")
@@ -283,7 +278,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user["active"] = True
     user["state"] = "normal"
     save_data(data)
-    
     await send(context.bot, chat_id,
         "Привет, брат.\n\n"
         "Я буду писать три раза в день — просто напомню: сегодня не надо.\n\n"
@@ -291,9 +285,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Все, кто тоже в деле, получат пуш. Просто узнают, что ты ещё здесь.\n"
         "Можешь жать до 5 раз в день, если совсем пиздец.\n\n"
         "Держись.",
-        save=False
-    )
-    
+        save=False)
     await update_pin(context.bot, chat_id)
     schedule_jobs(chat_id, context.job_queue)
 
@@ -303,38 +295,28 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user["active"] = False
     user["state"] = "normal"
     save_data(data)
-    
     for name in [f"morning_{chat_id}", f"evening_{chat_id}", f"night_{chat_id}", f"midnight_{chat_id}"]:
         for job in context.job_queue.get_jobs_by_name(name):
             job.schedule_removal()
-    
-    await send(context.bot, chat_id, "Остановлено. Жми ▶ Начать, когда будешь готов.", get_start_keyboard(), False)
+    await send(context.bot, chat_id, "Уведомления приостановлены. Жми ▶ Начать, когда будешь готов.", get_start_keyboard(), False)
 
 async def handle_hold(chat_id, context):
     data, user = get_user(chat_id)
     today = NOW().date()
-    
     last_date = user.get("hold_date")
     last_time = user.get("hold_time")
     count = user.get("hold_count", 0)
-    
     if str(last_date) != str(today):
         count = 0
-    
     if last_time:
-        last_dt = datetime.fromisoformat(last_time)
-        seconds_passed = (NOW() - last_dt).total_seconds()
-        if seconds_passed < 1800:
-            minutes_left = int((1800 - seconds_passed) / 60)
+        if (NOW() - datetime.fromisoformat(last_time)).total_seconds() < 1800:
+            minutes_left = int((1800 - (NOW() - datetime.fromisoformat(last_time)).total_seconds()) / 60)
             await send(context.bot, chat_id, f"Погоди ещё {minutes_left} минут, брат.")
             return
-    
     if count >= 5:
         await send(context.bot, chat_id, "Сегодня это уже 5 раз, брат, тормози. Завтра сможешь отправить еще. ✊")
         return
-    
     await send(context.bot, chat_id, random.choice(HOLD_RESPONSES), save=False)
-    
     for uid in get_active_users():
         if uid != chat_id:
             try:
@@ -342,7 +324,6 @@ async def handle_hold(chat_id, context):
                 await asyncio.sleep(0.08)
             except:
                 pass
-    
     user["hold_time"] = NOW().isoformat()
     user["hold_date"] = str(today)
     user["hold_count"] = count + 1
@@ -353,76 +334,71 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     data, user = get_user(chat_id)
     state = user.get("state", "normal")
-    
+
     if state == "heavy_menu":
         if text == "💪 Помочь себе":
-            await send(context.bot, chat_id, random.choice(HELP_TECHNIQUES), get_help_keyboard(), False)
+            tip = get_next_tip(user)
+            await send(context.bot, chat_id, tip, get_help_keyboard(), False)
             user["state"] = "help_mode"
             save_data(data)
-        elif text == "😞 Срыв":
+            return
+        if text == "😞 Срыв":
             reset_streak(chat_id)
             await send(context.bot, chat_id, "Ничего страшного.\nНачнём заново. Ты молодец, что сказал честно.", get_main_keyboard(), False)
             await update_pin(context.bot, chat_id)
             user["state"] = "normal"
             save_data(data)
-        elif text == "😅 Чуть не сорвался":
+            return
+        if text == "😅 Чуть не сорвался":
             await send(context.bot, chat_id, "Красавчик. Это и есть победа. ✊", get_main_keyboard(), False)
             user["state"] = "normal"
             save_data(data)
-        elif text == "↩️ Назад":
-            await send(context.bot, chat_id, "Держись.", get_main_keyboard(), False)
+            return
+        if text == "↩️ Назад":
             user["state"] = "normal"
+            user["used_tips"] = []
             save_data(data)
-        return
-    
+            await send(context.bot, chat_id, "Держись.", get_main_keyboard(), False)
+            return
+
     if state == "help_mode":
         if text == "🔄 Ещё способ":
-            await send(context.bot, chat_id, random.choice(HELP_TECHNIQUES), get_help_keyboard(), False)
-        elif text == "↩️ Назад":
-            await send(context.bot, chat_id, "Держись там.", get_main_keyboard(), False)
-            user["state"] = "normal"
+            tip = get_next_tip(user)
+            await send(context.bot, chat_id, tip, get_help_keyboard(), False)
             save_data(data)
-        return
-    
+            return
+        if text == "↩️ Назад":
+            user["state"] = "normal"
+            user["used_tips"] = []
+            save_data(data)
+            await send(context.bot, chat_id, "Держись там.", get_main_keyboard(), False)
+            return
+
     if text == "▶ Начать":
         await start(update, context)
-    
     elif text == "👋 Ты тут?":
         await asyncio.sleep(random.uniform(2.8, 5.5))
         await send(context.bot, chat_id, random.choice(TU_TUT_FIRST))
         await asyncio.sleep(random.uniform(2.0, 4.5))
         await send(context.bot, chat_id, random.choice(TU_TUT_SECOND))
-    
     elif text == "✊ Держусь":
         await handle_hold(chat_id, context)
-    
     elif text == "😔 Тяжело":
         user["state"] = "heavy_menu"
+        user["used_tips"] = []
         save_data(data)
         await send(context.bot, chat_id, "Что будем делать?", get_heavy_keyboard(), False)
-    
     elif text == "📊 Дни":
         days = get_days(chat_id)
         best = user.get("best_streak", 0)
-        
-        if days == 0:
-            msg = "Первый день."
-        elif days == 1:
-            msg = "Прошёл 1 день."
-        else:
-            msg = f"Прошло {days} дней."
-        
+        msg = "Первый день." if days == 0 else "Прошёл 1 день." if days == 1 else f"Прошло {days} дней."
         if best > 0 and best != days:
             msg += f"\n\nТвой лучший стрик: {best} дней."
-        
         await send(context.bot, chat_id, msg)
-    
     elif text == "❤️ Спасибо":
         await send(context.bot, chat_id,
             "Спасибо, брат. ❤️\n\nЕсли хочешь поддержать:\nСбер 2202 2084 3481 5313\n\nГлавное — держись.",
-            save=False
-        )
-    
+            save=False)
     elif text == "⏸ Пауза":
         await stop(update, context)
 
